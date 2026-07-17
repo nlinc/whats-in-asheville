@@ -28,7 +28,9 @@ or npm dependency unless explicitly asked.
 
 Everything lives at the **repo root** — there is no `public/` folder. Firebase
 Hosting's `public` in `firebase.json` is `.` (the root itself), with `firebase.json`,
-`.firebaserc`, `*.rules`, and `*.png` excluded via `ignore`.
+`.firebaserc`, `*.rules`, `*.png`, Markdown, `.git/**`, and `.firebase/**`
+excluded via `ignore`. Keep the explicit recursive dot-directory exclusions;
+Firebase's general `**/.*` pattern does not exclude their contents.
 
 - App entry / UI shell: `index.html`
 - Main client logic (state, rendering, event wiring): `app.js`
@@ -72,6 +74,11 @@ a `package.json` just to have "a loop." Verify manually instead:
 3. If you touched `firestore.rules` or `storage.rules`, re-read them line by
    line — there is no rules emulator/test harness wired up here, so a mistake
    ships straight to prod rules on deploy.
+4. If you touched `firebase.json` or deploy Hosting, inspect
+   `.firebase/hosting..cache` after deployment. It must list only the five public
+   assets: `index.html`, `styles.css`, `app.js`, `firebase-client.js`, and
+   `firebase-config.js`. Never deploy `.git`, `.firebase`, docs, rules, or preview
+   files from the root-hosted project.
 
 Never claim the work is complete without doing this manual pass, and state in
 your report which of the flows above you actually exercised.
