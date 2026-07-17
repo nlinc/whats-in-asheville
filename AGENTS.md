@@ -1,5 +1,7 @@
 # AGENTS.md — Asheville Condo Tracker (whats-in-asheville)
 
+> ⚙️ **Self-maintenance rule — do this automatically, every time.** If a change you make alters this repo's **shape** (files, entry points, structure), its **stack/dependencies**, the **build/test loop**, or a **guardrail**, you MUST update the matching section of THIS file in the *same commit* — before the task counts as done. This is not optional cleanup or a follow-up task.
+
 Tracks inventory (closets, cabinets, pantry, supplies), restock status, trip-prep
 tasks, and item photos for Nick's Asheville condo. Single household, two allowed
 users (Nick + Christina). Local-first: works fully offline via `localStorage`,
