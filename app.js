@@ -1,6 +1,7 @@
 import { firebaseService } from "./firebase-client.js";
 
 const STORAGE_KEY = "asheville-condo-tracker-v1";
+const DIRTY_KEY = `${STORAGE_KEY}-has-local-changes`;
 
 const rooms = [
   "Kitchen",
@@ -80,6 +81,8 @@ let applyingRemoteState = false;
 let editingItemId = null;
 let currentPhotoDataUrl = "";
 let originalSelectedFile = null;
+let resolvingRemoteState = false;
+let removeExistingPhoto = false;
 
 const els = {
   itemForm: document.querySelector("#itemForm"),
@@ -131,17 +134,38 @@ async function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   render();
 
-  if (!applyingRemoteState) {
-    await saveCloudState();
+  if (applyingRemoteState) return true;
+
+  if (firebaseService.user) {
+    return saveCloudState();
+  } else {
+    setLocalDirty(true);
+    return true;
   }
 }
 
 async function saveCloudState() {
   try {
     await firebaseService.saveState(state);
+    setLocalDirty(false);
+    return true;
   } catch (error) {
+    setLocalDirty(true);
     updateSyncStatus({ mode: "error", message: `Cloud save failed: ${friendlyFirebaseError(error)}` });
+    return false;
   }
+}
+
+function setLocalDirty(isDirty) {
+  localStorage.setItem(DIRTY_KEY, isDirty ? "true" : "false");
+}
+
+function hasLocalChanges() {
+  return localStorage.getItem(DIRTY_KEY) === "true";
+}
+
+function stateContentsMatch(first, second) {
+  return JSON.stringify({ items: first.items, tasks: first.tasks }) === JSON.stringify({ items: second.items, tasks: second.tasks });
 }
 
 function id() {
@@ -167,6 +191,7 @@ function setup() {
   els.roomFilter.addEventListener("change", renderInventory);
   document.querySelector("#clearFilters").addEventListener("click", clearFilters);
   document.querySelector("#seedExamples").addEventListener("click", addStarterSet);
+  document.querySelector("#jumpToAddItem").addEventListener("click", jumpToAddItem);
   document.querySelector("#exportData").addEventListener("click", exportData);
   document.querySelector("#importData").addEventListener("change", importData);
   document.querySelector("[data-jump-view='trip']").addEventListener("click", () => switchView("trip"));
@@ -202,11 +227,31 @@ function startFirebase() {
   firebaseService.init({
     onStatus: updateSyncStatus,
     onState: async (remoteState) => {
+      if (resolvingRemoteState) return;
+
       if (!remoteState) {
         if (state.items.length || state.tasks.length) {
           await saveCloudState();
         }
         return;
+      }
+
+      if (hasLocalChanges() && !stateContentsMatch(state, remoteState)) {
+        resolvingRemoteState = true;
+        const useLocal = window.confirm(
+          "This device has changes made while signed out.\n\nChoose OK to replace the shared tracker with this device's list. Choose Cancel to discard this device's changes and load the shared tracker."
+        );
+
+        if (useLocal) {
+          await saveCloudState();
+          resolvingRemoteState = false;
+          return;
+        }
+
+        setLocalDirty(false);
+        resolvingRemoteState = false;
+      } else {
+        setLocalDirty(false);
       }
 
       applyingRemoteState = true;
@@ -216,6 +261,11 @@ function startFirebase() {
       applyingRemoteState = false;
     }
   });
+}
+
+function jumpToAddItem() {
+  els.itemForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.setTimeout(() => document.querySelector("#itemName").focus(), 350);
 }
 
 function updateSyncStatus(status) {
@@ -303,6 +353,7 @@ async function handlePhotoSelect(event) {
   if (!file) return;
 
   originalSelectedFile = file;
+  removeExistingPhoto = false;
   
   const compressedDataUrl = await compressImage(file);
   currentPhotoDataUrl = compressedDataUrl;
@@ -314,6 +365,7 @@ async function handlePhotoSelect(event) {
 function handlePhotoRemove() {
   currentPhotoDataUrl = "";
   originalSelectedFile = null;
+  removeExistingPhoto = true;
   document.querySelector("#itemPhoto").value = "";
   els.photoPreview.src = "";
   els.photoPreviewContainer.classList.add("hidden");
@@ -332,6 +384,8 @@ async function handleItemFormSubmit(event) {
 
   let photo = "";
   const itemId = editingItemId || id();
+  const existingItem = editingItemId ? state.items.find((item) => item.id === editingItemId) : null;
+  let oldPhotoToDelete = "";
 
   if (currentPhotoDataUrl) {
     if (currentPhotoDataUrl.startsWith("data:")) {
@@ -353,6 +407,9 @@ async function handleItemFormSubmit(event) {
   }
 
   if (editingItemId) {
+    if (existingItem?.photo && (removeExistingPhoto || (photo && photo !== existingItem.photo))) {
+      oldPhotoToDelete = existingItem.photo;
+    }
     state.items = state.items.map((item) =>
       item.id === editingItemId
         ? {
@@ -364,7 +421,7 @@ async function handleItemFormSubmit(event) {
             quantity,
             location,
             notes,
-            photo: photo || item.photo,
+            photo: removeExistingPhoto ? "" : (photo || item.photo),
             updatedAt: new Date().toISOString()
           }
         : item
@@ -386,9 +443,14 @@ async function handleItemFormSubmit(event) {
     
     els.itemForm.reset();
     handlePhotoRemove();
+    removeExistingPhoto = false;
   }
 
-  await saveState();
+  const saved = await saveState();
+
+  if (saved && oldPhotoToDelete) {
+    await deleteCloudPhoto(oldPhotoToDelete);
+  }
 }
 
 function editItem(itemId) {
@@ -416,6 +478,7 @@ function editItem(itemId) {
     els.photoPreview.src = "";
     els.photoPreviewContainer.classList.add("hidden");
   }
+  removeExistingPhoto = false;
 
   els.formHeading.textContent = "Edit Item";
   els.itemFormSubmit.textContent = "Save Changes";
@@ -428,6 +491,7 @@ function cancelEditMode() {
   editingItemId = null;
   els.itemForm.reset();
   handlePhotoRemove();
+  removeExistingPhoto = false;
 
   els.formHeading.textContent = "Add Item";
   els.itemFormSubmit.textContent = "Add item";
@@ -622,7 +686,19 @@ async function deleteItem(itemId) {
   if (editingItemId === itemId) {
     cancelEditMode();
   }
-  await saveState();
+  const saved = await saveState();
+  if (saved) {
+    await deleteCloudPhoto(item.photo);
+  }
+}
+
+async function deleteCloudPhoto(photoUrl) {
+  if (!photoUrl || photoUrl.startsWith("data:") || !firebaseService.user) return;
+  try {
+    await firebaseService.deletePhoto(photoUrl);
+  } catch (error) {
+    console.warn("Could not remove the old cloud photo", error);
+  }
 }
 
 function clearFilters() {
@@ -690,17 +766,20 @@ function renderPhotos() {
   itemsWithPhotos.forEach((item) => {
     const card = document.createElement("article");
     card.className = "photo-card";
-    card.innerHTML = `
-      <img src="${item.photo}" alt="${escapeHtml(item.name)} photo">
-      <div>
-        <strong>${escapeHtml(item.name)}</strong>
-        <p>${escapeHtml(item.room)} / ${escapeHtml(item.location || item.category)}</p>
-      </div>
-    `;
 
-    const img = card.querySelector("img");
+    const img = document.createElement("img");
+    img.src = item.photo;
+    img.alt = `${item.name} photo`;
     img.style.cursor = "pointer";
     img.addEventListener("click", () => openLightbox(item));
+
+    const details = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const location = document.createElement("p");
+    location.textContent = `${item.room} / ${item.location || item.category}`;
+    details.append(name, location);
+    card.append(img, details);
 
     els.photoGrid.append(card);
   });
@@ -762,8 +841,10 @@ function exportData() {
   const link = document.createElement("a");
   link.href = url;
   link.download = `asheville-condo-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function importData(event) {
@@ -774,6 +855,9 @@ async function importData(event) {
     const nextState = JSON.parse(await file.text());
     if (!Array.isArray(nextState.items) || !Array.isArray(nextState.tasks)) {
       throw new Error("Invalid tracker backup");
+    }
+    if (!window.confirm("Importing this backup will replace the current tracker. Continue?")) {
+      return;
     }
     state = {
       items: nextState.items,

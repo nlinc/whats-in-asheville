@@ -35,12 +35,13 @@ Hosting's `public` in `firebase.json` is `.` (the root itself), with `firebase.j
 - Styles: `styles.css`
 - Firebase browser config (public config + `householdId`): `firebase-config.js`
 - Firebase service wrapper (auth, Firestore sync, Storage photo upload): `firebase-client.js`
-- Firestore rules: `firestore.rules` — locks `households/{householdId}` to two
+- Firestore rules: `firestore.rules` — locks `households/asheville-condo` to two
   hardcoded emails (`nlincoln28@gmail.com`, `cspritke@gmail.com`)
-- Storage rules: `storage.rules` — same two-email lock, scoped to
-  `households/{householdId}/**`
+- Storage rules: `storage.rules` — same household and two-email lock, scoped to
+  `households/asheville-condo/**`
 - Hosting/Firestore/Storage config: `firebase.json`
 - `.firebaserc`: points at project `lincoln-second-home`
+- Project notes and Firebase setup: `README.md`
 - Preview image: `asheville-tracker-preview.png` (not deployed — excluded in
   `firebase.json` `ignore`)
 - Tests: none. There is no `package.json`, no test runner, no `node_modules`.
@@ -51,9 +52,9 @@ Hosting's `public` in `firebase.json` is `.` (the root itself), with `firebase.j
 There is no build, lint, or test command in this repo — don't invent one or add
 a `package.json` just to have "a loop." Verify manually instead:
 
-1. Open `index.html` directly in a browser (or serve the root with any static
-   file server — `python3 -m http.server` works fine) and exercise the flow you
-   touched:
+1. Serve the repo root over HTTP (`python3 -m http.server` works fine), then open
+   it in a browser. Do not rely on opening `index.html` as a `file://` URL because
+   the app uses ES modules. Exercise the flow you touched:
    - **Local mode** (no sign-in): add an item, edit it, mark it Running low/Out/In
      stock, delete it, attach a photo, confirm it lands in Photo Memory and the
      Next Trip Snapshot.
@@ -62,7 +63,9 @@ a `package.json` just to have "a loop." Verify manually instead:
    - **Import/Export**: Export Backup downloads JSON; Import Backup round-trips it.
    - **Sign-in flow** (if `firebase-config.js` has real values and you can reach
      Firebase): Sign In, confirm the sync pill updates (Local → Signed out →
-     Syncing as ...), add an item, confirm it round-trips through Firestore.
+     Syncing as ...), add an item, confirm it round-trips through Firestore. If
+     the device has signed-out changes, verify the explicit local-versus-shared
+     choice before either list is replaced.
    - **Mobile viewport**: resize / use device toolbar — this app is used from a
      phone while packing.
 2. Check the browser console for errors on load and after each action above.
@@ -75,22 +78,20 @@ your report which of the flows above you actually exercised.
 
 ## Guardrails
 
-- **Human owns the push.** This repo has no git remote configured yet. Once one
-  is added, a push to `main` is expected to auto-deploy to production Firebase
-  Hosting exactly like Nick's other Micro-Apps — the same rule applies then:
-  agents never `git push` and never run `firebase deploy`. Commit locally,
-  report the SHA, and stop. Push/deploy only on an explicit instruction.
+- **Human owns the push by default.** The `origin` remote is
+  `https://github.com/nlinc/whats-in-asheville.git`. A push to `main` is expected
+  to auto-deploy Firebase Hosting like Nick's other Micro-Apps. Agents commit
+  locally, report the SHA, and stop unless the user explicitly requests a push
+  or Firebase deploy.
 - **Surgical changes only.** No unrelated refactors, reformatting, or drive-by
   "cleanup."
 - **Mobile first.** Verify the mobile layout after any UI change — this is a
   packing-list app used from a phone.
 - **No plain `innerHTML` for user-entered data.** Prefer `textContent` or
-  building DOM nodes, as most of `app.js` already does. The two spots that do
-  build HTML strings for item data (`renderAttention`, `renderPhotos`) run every
-  interpolated field through the existing `escapeHtml()` helper at the bottom of
-  `app.js` — if you touch either of those functions or add a new one like them,
-  keep using `escapeHtml()` on every field; don't drop it and don't add a new
-  unescaped `innerHTML` template for item/task data.
+  building DOM nodes, as most of `app.js` already does. `renderAttention` still
+  uses an HTML string and runs every interpolated item field through the existing
+  `escapeHtml()` helper. If you touch it or add a similar renderer, escape every
+  field or build DOM nodes instead. This includes URLs imported from backups.
 - **Two-user access model.** `firestore.rules` and `storage.rules` are both
   hardcoded to two literal emails. Don't genericize this into an open or
   role-based model without being asked — the whole point is it's a private
@@ -103,13 +104,21 @@ your report which of the flows above you actually exercised.
   fields empty/missing (pure `localStorage` mode — see `hasConfig` in
   `firebase-client.js`). Don't make Firebase a hard dependency for basic
   add/edit/delete.
+- **Simple shared-state model.** Firestore stores the complete item/task state in
+  one household document, so signed-in changes are last-write-wins. Changes made
+  while signed out are marked locally; on the next sign-in, the user must choose
+  whether to upload that device's list or discard it in favor of the shared list.
+  Do not silently overwrite either side or add complex merge machinery without
+  an explicit product decision.
 - **Photos**: item photos are client-compressed to a data URL (`compressImage`)
   before either being stored inline (local mode) or uploaded to Storage under
   `households/{householdId}/items/{itemId}/...` (signed-in mode). Keep both
-  paths working if you touch photo handling.
-- **Destructive ops**: item and task delete both require an existing confirm
-  step (`window.confirm` for items) or are low-stakes (tasks). Don't remove the
-  confirm on item delete.
+  paths working if you touch photo handling. When signed in, replacing, removing,
+  or deleting an item's cloud photo must also remove the superseded Storage
+  object after the new state saves successfully.
+- **Destructive ops**: item deletion and backup import require confirmation.
+  Task deletion is intentionally immediate because tasks are low-stakes. Don't
+  remove the item/import confirmations without an explicit request.
 
 ## Maintaining this file
 

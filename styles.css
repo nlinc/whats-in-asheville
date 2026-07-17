@@ -167,6 +167,7 @@ h3 {
 }
 
 .header-actions,
+.section-actions,
 .field-row,
 .tabs,
 .filter-group,
@@ -717,7 +718,12 @@ textarea {
     width: 100%;
   }
 
-  .header-actions > * {
+  .section-actions {
+    width: 100%;
+  }
+
+  .header-actions > *,
+  .section-actions > * {
     flex: 1;
     justify-content: center;
   }
@@ -993,4 +999,3 @@ textarea {
     font-size: 20px;
   }
 }
-

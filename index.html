@@ -129,7 +129,7 @@
               </label>
               <div id="photoPreviewContainer" class="photo-preview-container hidden">
                 <img id="photoPreview" src="" alt="Selected photo preview">
-                <button type="button" id="removePhoto" class="remove-photo-btn" title="Remove photo">&times;</button>
+                <button type="button" id="removePhoto" class="remove-photo-btn" title="Remove photo" aria-label="Remove photo">&times;</button>
               </div>
               <div class="form-actions-row">
                 <button class="primary-button" id="itemFormSubmit" type="submit">Add item</button>
@@ -173,7 +173,10 @@
                 <h2>What's There</h2>
                 <p>Room-by-room items with quantities, shelf locations, and restock status.</p>
               </div>
-              <button class="secondary-button" id="seedExamples" type="button">Add starter set</button>
+              <div class="section-actions">
+                <button class="primary-button" id="jumpToAddItem" type="button">Add item</button>
+                <button class="secondary-button" id="seedExamples" type="button">Add starter set</button>
+              </div>
             </div>
             <div id="inventoryList" class="item-list"></div>
             <div id="emptyInventory" class="empty-state">

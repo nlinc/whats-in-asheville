@@ -101,6 +101,11 @@ const service = {
     const photoRef = storageModule.ref(storage, `households/${householdId}/items/${itemId}/${Date.now()}-${safeName}`);
     await storageModule.uploadBytes(photoRef, file, { contentType: file.type });
     return storageModule.getDownloadURL(photoRef);
+  },
+  async deletePhoto(photoUrl) {
+    if (!storage || !service.user || !photoUrl || photoUrl.startsWith("data:")) return;
+    const storageModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-storage.js`);
+    await storageModule.deleteObject(storageModule.ref(storage, photoUrl));
   }
 };
 
