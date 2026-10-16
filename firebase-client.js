@@ -19,6 +19,12 @@ const service = {
       return;
     }
 
+    if (navigator.onLine === false) {
+      onStatus({ mode: "local", message: "Offline. Your saved inventory is available on this device. Connect to share changes." });
+      window.addEventListener("online", () => service.init({ onStatus, onState }), { once: true });
+      return;
+    }
+
     try {
       const appModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-app.js`);
       const authModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-auth.js`);

@@ -1,7 +1,18 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <meta name="theme-color" content="#f6f3eb"> <title>What's where · Home inventory</title> <link rel="stylesheet" href="styles.css?v=20261016-6">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#f6f3eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="What's where">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>What's where · Home inventory</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="styles.css?v=20261016-pwa2">
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to inventory</a>
@@ -206,11 +217,11 @@
         </details>
         <p id="itemFormError" class="form-error" role="alert">
         </p>
-        <div class="dialog-actions">
-          <button class="primary-button" id="itemFormSubmit" type="submit">Save item</button><button id="deleteEditingItem" class="danger-button hidden" type="button">Delete item</button>
-        </div>
-        <button id="photoInstead" class="text-button" type="button">A whole closet? Just take a photo →</button>
       </form>
+      <div class="dialog-actions form-footer">
+        <button class="primary-button" id="itemFormSubmit" type="submit" form="itemForm">Save item</button><button id="deleteEditingItem" class="danger-button hidden" type="button">Delete item</button>
+      </div>
+      <button id="photoInstead" class="text-button" type="button">A whole closet? Just take a photo →</button>
     </dialog>
     <dialog id="placeDialog" class="sheet" aria-labelledby="placeHeading">
       <div class="dialog-heading">
@@ -247,8 +258,10 @@
         </label>
         <p id="placeFormError" class="form-error" role="alert">
         </p>
-        <button id="savePlace" class="primary-button" type="submit">Save photo</button>
       </form>
+      <div class="dialog-actions form-footer">
+        <button id="savePlace" class="primary-button" type="submit" form="placeForm">Save photo</button>
+      </div>
     </dialog>
     <dialog id="settingsDialog" class="sheet" aria-labelledby="settingsHeading">
       <div class="dialog-heading">
@@ -262,6 +275,12 @@
         </div>
         <button class="close-button" data-close="settingsDialog" aria-label="Close settings" type="button">×</button>
       </div>
+      <section class="settings-section">
+        <h3>Keep it on your Home Screen</h3>
+        <p id="installHelp" class="muted">On iPhone: open in Safari, tap Share, then Add to Home Screen. Keep Open as Web App on if shown. On Android: use your browser’s Install app or Add to Home screen option.</p>
+        <button id="installApp" class="primary-button hidden" type="button">Install app</button>
+        <p id="offlineStatus" class="muted" aria-live="polite"></p>
+      </section>
       <section class="settings-section">
         <h3>
           Shared with your person
@@ -321,6 +340,7 @@
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
     </div>
-    <script type="module" src="app.js?v=20261016-6"></script>
+    <script type="module" src="app.js?v=20261016-pwa2"></script>
+    <script type="module" src="pwa.js?v=20261016-pwa2"></script>
   </body>
 </html>

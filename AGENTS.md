@@ -7,9 +7,10 @@ condo and Morganton home. Asheville is the default: the primary use is checking
 what is already there while packing for the hour drive. Room browsing and search
 come first; item details, restock status, and trip reminders are secondary.
 Single household, two allowed users (Nick + Christina). Local-first: inventory
-works without Firebase via `localStorage` and syncs when signed in. A loaded app
-works offline; a fresh offline load depends on browser caching (no service worker). Keep changes conservative and preserve the
-existing structure.
+works without Firebase via `localStorage` and syncs when signed in. A service
+worker caches the public app shell for cold offline starts after the first online
+visit; sharing and cloud photos need a connection. Keep changes conservative and
+preserve the existing structure.
 
 ## Stack (authoritative)
 
@@ -29,9 +30,10 @@ or npm dependency unless explicitly asked.
 
 ## Project shape
 
-Everything lives at the **repo root** — there is no `public/` folder. Firebase
-Hosting's `public` in `firebase.json` is `.` (the root itself), with `firebase.json`,
-`.firebaserc`, `*.rules`, `*.png`, Markdown, `.git/**`, and `.firebase/**`
+App entry files live at the **repo root**, with install icons under `icons/`.
+There is no `public/` folder. Firebase Hosting's `public` in `firebase.json` is `.`
+(the root itself), with `firebase.json`,
+`.firebaserc`, `*.rules`, the preview PNG, Markdown, `.git/**`, and `.firebase/**`
 excluded via `ignore`. Keep the explicit recursive dot-directory exclusions;
 Firebase's general `**/.*` pattern does not exclude their contents.
 
@@ -45,6 +47,15 @@ Firebase's general `**/.*` pattern does not exclude their contents.
   tasks without `homeId` migrate to `asheville`; old backups remain importable.
   Both homes still share the original single Firestore household document.
 - Styles: `styles.css`
+- Installable app: `manifest.webmanifest`, `sw.js`, `pwa.js`, and `icons/` (the SVG
+  mark, 192px/512px PNG icons, and 180px Apple touch icon). No native wrapper or
+  build step. `pwa.js` also fits dialogs to the visual viewport above a keyboard.
+- Item and room-photo forms scroll their fields independently; their Save footers
+  remain visible. Keep this separation when editing these forms.
+- Navigation: the History API tracks homes, rooms, views, and open dialogs.
+  Browser Back closes a form before leaving its room. The standalone Home Screen
+  app adds a right swipe from the leftmost 24px; item status swipes exclude this
+  edge. Required shared-list decisions cannot be dismissed with Back.
 - Firebase browser config (public config + `householdId`): `firebase-config.js`
 - Firebase service wrapper (auth, Firestore sync, Storage photo upload): `firebase-client.js`
 - Firestore rules: `firestore.rules` — locks `households/asheville-condo` to two
@@ -93,15 +104,28 @@ a `package.json` just to have "a loop." Verify manually instead:
      scrolling. This app is used from a phone while packing.
    - **Asset freshness**: index.html versions its CSS/app URLs and app.js versions
      its firebase-client import with matching release query strings. Bump them
-     together when changing browser assets so cached versions cannot mix.
+     together when changing browser assets so cached versions cannot mix. Also
+     bump the release in sw.js and update its explicit ASSETS list. Service-worker
+     updates wait for all old app windows to close; never force-reload a form.
+   - **Installation/offline**: check manifest fields and all icon dimensions;
+     Settings must show installation instructions and offline readiness. After
+     caching, stop the local HTTP server and cold-reload the app, then add/edit an
+     item. The worker must bypass Firebase, authentication, cloud photos, and
+     unknown routes. Verify cache update/cleanup separately from household data.
+   - **Phone keyboard/back**: test a 390px-wide viewport with only 350px of height;
+     scroll to Notes and save with the footer still visible. Check actual phone
+     keyboard behavior after release. Back must restore rooms/views, close forms,
+     and cancel a delete prompt; left-edge back must not change item status.
 2. Check the browser console for errors on load and after each action above.
 3. If you touched `firestore.rules` or `storage.rules`, re-read them line by
    line — there is no rules emulator/test harness wired up here, so a mistake
    ships straight to prod rules on deploy.
 4. If you touched `firebase.json` or deploy Hosting, inspect
-   `.firebase/hosting..cache` after deployment. It must list only the five public
-   assets: `index.html`, `styles.css`, `app.js`, `firebase-client.js`, and
-   `firebase-config.js`. Never deploy `.git`, `.firebase`, docs, rules, or preview
+   `.firebase/hosting..cache` after deployment. It must list exactly twelve public
+   assets: `index.html`, `styles.css`, `app.js`, `firebase-client.js`,
+   `firebase-config.js`, `pwa.js`, `sw.js`, `manifest.webmanifest`,
+   `icons/app-icon.svg`, `icons/icon-192.png`, `icons/icon-512.png`, and
+   `icons/apple-touch-icon.png`. Never deploy `.git`, `.firebase`, docs, rules, or preview
    files from the root-hosted project.
 
 Never claim the work is complete without doing this manual pass, and state in
@@ -110,8 +134,9 @@ your report which of the flows above you actually exercised.
 ## Guardrails
 
 - **Human owns the push by default.** The `origin` remote is
-  `https://github.com/nlinc/whats-in-asheville.git`. A push to `main` is expected
-  to auto-deploy Firebase Hosting like Nick's other Micro-Apps. Do not commit,
+  `https://github.com/nlinc/whats-in-asheville.git`. This repository
+  does not currently have a GitHub auto-deploy workflow; publishing requires a
+  Firebase Hosting deploy. Do not commit,
   push, or deploy unless the user explicitly requests that exact action.
 - **Surgical changes only.** No unrelated refactors, reformatting, or drive-by
   "cleanup."
@@ -129,6 +154,11 @@ your report which of the flows above you actually exercised.
   are normal client-side Firebase config, fine to commit. Don't add a `.env` or
   secrets manager for it. If real API secrets are ever introduced, those go in
   Firebase/Google secret management, never in this repo.
+- **Service worker scope.** Cache only the allowlisted public shell assets.
+  Never cache Firebase API/authentication responses or cloud photo URLs. Retire
+  only caches with the `whats-where-shell-` prefix. Household data stays in the
+  original localStorage/Firestore paths. Offline changes remain local; reopening
+  online preserves the explicit local-versus-shared choice.
 - **Local-first, cloud-optional.** The app must keep working with `firebaseConfig`
   fields empty/missing (pure `localStorage` mode — see `hasConfig` in
   `firebase-client.js`). Don't make Firebase a hard dependency for basic

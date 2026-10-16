@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261016-6";
+import { firebaseService } from "./firebase-client.js?v=20261016-pwa2";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -13,6 +13,11 @@ let state = loadState();
 let durableState = structuredClone(state);
 let activeHome = "asheville";
 let activeRoom = "All";
+let activeView = "inventory";
+let navigationDepth = 0;
+let navigationReady = false;
+let restoringNavigation = false;
+const allowedDialogClosures = new Set();
 let editingItemId = null;
 let itemPhoto = "";
 let itemPhotoChanged = false;
@@ -38,22 +43,119 @@ function button(text, className, onClick, label) {
   el.addEventListener("click", onClick);
   return el;
 }
+// Give browser/phone back gestures real places to return to, without URL routing.
+function navigationSnapshot() {
+  return { app: "whats-where", depth: navigationDepth, home: activeHome, room: activeRoom,
+    view: activeView, search: $("#searchInput").value, status: $("#statusFilter").value,
+    dialogs: [...document.querySelectorAll("dialog[open]")].map((dialog) => dialog.id) };
+}
+function rememberNavigation(replace = false) {
+  if (!navigationReady || restoringNavigation) return;
+  const next = navigationSnapshot();
+  const current = history.state;
+  const contents = (entry) => JSON.stringify({ ...entry, depth: 0 });
+  if (!replace && current?.app === "whats-where" && contents(current) === contents(next)) return;
+  if (!replace) next.depth = ++navigationDepth;
+  history[replace ? "replaceState" : "pushState"](next, "");
+}
+function showDialog(dialog) {
+  dialog.showModal();
+  rememberNavigation();
+}
+function closeDialog(dialog) {
+  if (!dialog.open) return Promise.resolve();
+  const current = history.state;
+  if (current?.app === "whats-where" && current.dialogs?.at(-1) === dialog.id && navigationDepth > 0) {
+    allowedDialogClosures.add(dialog.id);
+    // Forward navigation must not resurrect a submitted or discarded form.
+    history.replaceState({ ...current, dialogs: current.dialogs.filter((id) => id !== dialog.id) }, "");
+    return new Promise((resolve) => {
+      dialog.addEventListener("close", resolve, { once: true });
+      history.back();
+    });
+  }
+  dialog.close();
+  return Promise.resolve();
+}
+function goBack() {
+  const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
+  if (dialog) {
+    if (dialog.dataset.requireChoice !== "true") closeDialog(dialog);
+    return;
+  }
+  if (navigationDepth > 0) history.back();
+}
+function setupNavigation() {
+  navigationReady = true;
+  rememberNavigation(true);
+  window.addEventListener("popstate", (event) => {
+    const next = event.state;
+    if (next?.app !== "whats-where") return;
+    const required = document.querySelector('dialog[open][data-require-choice="true"]');
+    if (required && !next.dialogs?.includes(required.id) && !allowedDialogClosures.has(required.id)) {
+      history.pushState(navigationSnapshot(), "");
+      return;
+    }
+    restoringNavigation = true;
+    navigationDepth = next.depth || 0;
+    activeHome = next.home || "asheville";
+    activeRoom = next.room || "All";
+    $("#searchInput").value = next.search || "";
+    $("#statusFilter").value = Object.hasOwn(statuses, next.status) ? next.status : "All";
+    document.querySelectorAll("dialog[open]").forEach((dialog) => {
+      if (!next.dialogs?.includes(dialog.id)) {
+        allowedDialogClosures.delete(dialog.id);
+        dialog.close();
+      }
+    });
+    switchView(next.view === "trip" ? "trip" : "inventory", false);
+    render();
+    restoringNavigation = false;
+    // Never reopen a stale edit form when the user goes forward.
+    rememberNavigation(true);
+  });
+  // Safari's normal browser uses its native history gesture. Home Screen apps
+  // get a left-edge gesture here; middle-of-row swipes remain status actions.
+  let edge = null;
+  const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  document.addEventListener("touchstart", (event) => {
+    const touch = event.touches[0];
+    edge = installed() && event.touches.length === 1 && touch.clientX <= 24 &&
+      (navigationDepth > 0 || document.querySelector("dialog[open]"))
+      ? { x: touch.clientX, y: touch.clientY, dx: 0 } : null;
+  }, { passive: true });
+  document.addEventListener("touchmove", (event) => {
+    if (!edge || event.touches.length !== 1) { edge = null; return; }
+    const touch = event.touches[0];
+    const dx = touch.clientX - edge.x, dy = touch.clientY - edge.y;
+    if (Math.abs(dy) > Math.max(12, Math.abs(dx))) { edge = null; return; }
+    if (dx > 12) { edge.dx = dx; event.preventDefault(); }
+  }, { passive: false });
+  document.addEventListener("touchend", () => {
+    const distance = edge?.dx || 0;
+    edge = null;
+    if (distance >= 72) goBack();
+  });
+  document.addEventListener("touchcancel", () => { edge = null; });
+}
+
 let confirmationQueue = Promise.resolve();
 function confirmAction({ title, message, accept = "Continue", cancel = "Keep it", requireChoice = false }) {
   const next = confirmationQueue.then(() => new Promise((resolve) => {
     const dialog = $("#confirmationDialog");
+    dialog.dataset.requireChoice = String(requireChoice);
     $("#confirmationTitle").textContent = title;
     $("#confirmationMessage").textContent = message;
     $("#confirmationAccept").textContent = accept;
     $("#confirmationCancel").textContent = cancel;
     let answer = false;
-    const close = () => { dialog.removeEventListener("cancel", onCancel); dialog.removeEventListener("close", close); $("#confirmationAccept").onclick = null; $("#confirmationCancel").onclick = null; resolve(answer); };
+    const close = () => { dialog.removeEventListener("cancel", onCancel); dialog.removeEventListener("close", close); $("#confirmationAccept").onclick = null; $("#confirmationCancel").onclick = null; delete dialog.dataset.requireChoice; resolve(answer); };
     const onCancel = (event) => { if (requireChoice) event.preventDefault(); };
-    $("#confirmationAccept").onclick = () => { answer = true; dialog.close(); };
-    $("#confirmationCancel").onclick = () => dialog.close();
+    $("#confirmationAccept").onclick = () => { answer = true; closeDialog(dialog); };
+    $("#confirmationCancel").onclick = () => closeDialog(dialog);
     dialog.addEventListener("cancel", onCancel);
     dialog.addEventListener("close", close);
-    dialog.showModal();
+    showDialog(dialog);
   }));
   confirmationQueue = next.catch(() => {});
   return next;
@@ -120,6 +222,10 @@ async function saveState() {
     return null;
   }
   render();
+  if (navigator.onLine === false) {
+    updateSyncStatus({ mode: "local", message: "Offline. Changes are saved on this device. Reopen when connected to review and share them." });
+    return true;
+  }
   if (!firebaseService.user) return true;
   return saveCloudState();
 }
@@ -213,6 +319,7 @@ function selectHome(homeId) {
   activeRoom = "All";
   $("#statusFilter").value = "All";
   render();
+  rememberNavigation();
 }
 function renderHomes() {
   if (activeHome !== "All" && !state.homes.some((home) => home.id === activeHome)) activeHome = "asheville";
@@ -280,7 +387,7 @@ function renderRooms() {
   $("#roomGrid").replaceChildren();
   entries.forEach((entry) => {
     const card = textNode("article", "", `room-card${entry.place?.photo ? " has-photo" : ""}`);
-    const open = button("", "room-open", () => { if (activeHome === "All") activeHome = entry.homeId; activeRoom = entry.name; $("#searchInput").value = ""; render(); });
+    const open = button("", "room-open", () => { if (activeHome === "All") activeHome = entry.homeId; activeRoom = entry.name; $("#searchInput").value = ""; render(); rememberNavigation(); });
     open.setAttribute("aria-label", `Open ${entry.name}${activeHome === "All" ? ` in ${homeName(entry.homeId)}` : ""}`);
     if (entry.place?.photo) {
       const img = document.createElement("img"); img.className = "room-image"; img.src = entry.place.photo; img.alt = ""; img.loading = "lazy"; open.append(img);
@@ -345,7 +452,7 @@ function renderInventory() {
     const card = textNode("article", "", "item-card photo-result");
     const thumb = button("▧", "item-thumb", () => openPlace(place.name, place.homeId), `View ${place.name}`);
     if (place.photo) { const img = document.createElement("img"); img.src = place.photo; img.alt = ""; thumb.replaceChildren(img); }
-    const copy = textNode("div", "", "item-copy"); copy.append(button(place.name, "item-name", () => { activeHome = place.homeId; activeRoom = place.name; $("#searchInput").value = ""; render(); }), textNode("p", `${homeName(place.homeId)} · Room photo${place.notes ? ` · ${place.notes}` : ""}`, "item-meta"));
+    const copy = textNode("div", "", "item-copy"); copy.append(button(place.name, "item-name", () => { activeHome = place.homeId; activeRoom = place.name; $("#searchInput").value = ""; render(); rememberNavigation(); }), textNode("p", `${homeName(place.homeId)} · Room photo${place.notes ? ` · ${place.notes}` : ""}`, "item-meta"));
     card.append(thumb, copy); $("#inventoryList").append(card);
   });
   if (places.length) $("#resultCount").textContent = `${items.length + places.length} ${items.length + places.length === 1 ? "result" : "results"}`;
@@ -362,7 +469,7 @@ function setupSwipe(card, itemId) {
   let offset = 0;
   let suppressClick = false;
   card.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.target.closest("select")) return;
+    if (event.button !== 0 || event.clientX <= 24 || event.target.closest("select")) return;
     suppressClick = false;
     start = { x: event.clientX, y: event.clientY }; offset = 0;
   });
@@ -393,10 +500,12 @@ async function updateStatus(itemId, status) {
     if (current && current.status === status) { current.status = previous; current.updatedAt = new Date().toISOString(); savedMessage(await saveState(), "Undone."); }
   });
 }
-function clearFilters() { activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All"; renderInventory(); }
-function switchView(view) {
+function clearFilters() { activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All"; renderInventory(); rememberNavigation(); }
+function switchView(view, remember = true) {
+  activeView = view;
   document.querySelectorAll(".tab").forEach((tab) => { tab.classList.toggle("active", tab.dataset.view === view); tab.setAttribute("aria-pressed", String(tab.dataset.view === view)); });
   document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `${view}View`));
+  if (remember) rememberNavigation();
 }
 function render() {
   renderHomes(); renderInventory(); renderTasks();
@@ -413,7 +522,7 @@ function openItem() {
   fillHomeSelect($("#itemHome"), activeHome);
   $("#itemRoom").value = activeRoom === "All" ? "" : activeRoom;
   updatePhotoPreview("item", "");
-  $("#itemDialog").showModal();
+  showDialog($("#itemDialog"));
 }
 function editItem(itemId) {
   const item = state.items.find((entry) => entry.id === itemId); if (!item) return;
@@ -483,10 +592,11 @@ async function submitItem(event) {
     const photo = await cloudPhoto(itemPhoto, itemPhotoChanged, recordId);
     const item = { ...oldItem, id: recordId, name, homeId: form.get("homeId"), room: form.get("room").trim() || "Unsorted", category: form.get("category"), status: form.get("status"), quantity: form.get("quantity").trim(), location: form.get("location").trim(), notes: form.get("notes").trim(), photo, updatedAt: new Date().toISOString() };
     if (oldItem) state.items = state.items.map((entry) => entry.id === recordId ? item : entry); else state.items.unshift(item);
-    activeHome = item.homeId; activeRoom = item.room; $("#searchInput").value = ""; $("#statusFilter").value = "All";
     const saved = await saveState();
     if (saved === null) { $("#itemFormError").textContent = "Device storage is full. Your item was not saved. Export a backup in settings."; return; }
-    $("#itemDialog").close(); switchView("inventory");
+    await closeDialog($("#itemDialog"));
+    activeHome = item.homeId; activeRoom = item.room; $("#searchInput").value = ""; $("#statusFilter").value = "All";
+    render(); switchView("inventory");
     if (saved && oldItem?.photo && oldItem.photo !== photo) await deleteCloudPhoto(oldItem.photo);
     savedMessage(saved, `Remembered in ${homeName(item.homeId)} · ${item.room}.`);
   } catch (error) { $("#itemFormError").textContent = `Could not save the photo. ${error.message}`; }
@@ -496,7 +606,7 @@ async function deleteItem() {
   const item = state.items.find((entry) => entry.id === editingItemId);
   if (!item || !await confirmAction({ title: `Delete ${item.name}?`, message: "This removes the item and its photo from your inventory. This cannot be undone.", accept: "Delete item", cancel: "Keep item" })) return;
   state.items = state.items.filter((entry) => entry.id !== item.id);
-  const saved = await saveState(); if (saved === null) return; $("#itemDialog").close();
+  const saved = await saveState(); if (saved === null) return; await closeDialog($("#itemDialog"));
   if (saved) await deleteCloudPhoto(item.photo);
   savedMessage(saved, "Item removed.");
 }
@@ -507,7 +617,7 @@ function openPlace(name = "", homeId = activeHome) {
   const existing = state.places.find((place) => place.homeId === $("#placeHome").value && place.name === name);
   editingPlaceId = existing?.id || null; placePhoto = existing?.photo || ""; placePhotoChanged = false;
   $("#placeNotes").value = existing?.notes || "";
-  updatePhotoPreview("place", placePhoto); $("#placeDialog").showModal();
+  updatePhotoPreview("place", placePhoto); showDialog($("#placeDialog"));
 }
 async function submitPlace(event) {
   event.preventDefault(); if ($("#savePlace").disabled) return;
@@ -524,10 +634,11 @@ async function submitPlace(event) {
     // Renaming a photographed room moves its items along with it.
     if (existing && (existing.name !== name || existing.homeId !== homeId)) state.items = state.items.map((item) => item.homeId === existing.homeId && item.room === existing.name ? { ...item, homeId, room: name } : item);
     if (existing) state.places = state.places.map((entry) => entry.id === recordId ? place : entry); else state.places.push(place);
-    activeHome = homeId; activeRoom = name; $("#searchInput").value = "";
     const saved = await saveState();
     if (saved === null) { $("#placeFormError").textContent = "Device storage is full. Your photo was not saved. Export a backup in settings."; return; }
-    $("#placeDialog").close(); switchView("inventory");
+    await closeDialog($("#placeDialog"));
+    activeHome = homeId; activeRoom = name; $("#searchInput").value = "";
+    render(); switchView("inventory");
     if (saved && existing?.photo && existing.photo !== photo) await deleteCloudPhoto(existing.photo);
     savedMessage(saved, `A little memory of ${name}.`);
   } catch (error) { $("#placeFormError").textContent = `Could not save the photo. ${error.message}`; }
@@ -539,7 +650,7 @@ function openLightbox(entry) {
   $("#lightboxTitle").textContent = entry.name;
   $("#lightboxMeta").textContent = [homeName(entry.homeId), entry.room, entry.location].filter(Boolean).join(" · ");
   $("#lightboxNotes").textContent = entry.notes || "";
-  $("#lightbox").showModal();
+  showDialog($("#lightbox"));
 }
 function renderTasks() {
   $("#attentionList").replaceChildren();
@@ -581,7 +692,7 @@ function openSettings() {
   $("#homeFields").replaceChildren(...state.homes.map((home) => {
     const label = textNode("label", home.id === "asheville" ? "Weekend place" : "Main home");
     const input = document.createElement("input"); input.name = home.id; input.value = home.name; input.required = true; input.maxLength = 80; label.append(input); return label;
-  })); $("#settingsDialog").showModal();
+  })); showDialog($("#settingsDialog"));
 }
 function exportData() {
   const url = URL.createObjectURL(new Blob([loadFailure ? localStorage.getItem(STORAGE_KEY) : JSON.stringify(state, null, 2)], { type: "application/json" }));
@@ -604,8 +715,12 @@ function setup() {
   $("#itemCategory").replaceChildren(...categories.map((category) => new Option(category, category)));
   $("#jumpToAddItem").addEventListener("click", openItem);
   document.querySelectorAll("[data-add-item]").forEach((el) => el.addEventListener("click", openItem));
-  document.querySelectorAll("[data-close]").forEach((el) => el.addEventListener("click", () => $("#" + el.dataset.close).close()));
-  document.querySelectorAll("dialog:not(#confirmationDialog)").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close(); } }));
+  document.querySelectorAll("[data-close]").forEach((el) => el.addEventListener("click", () => closeDialog($("#" + el.dataset.close))));
+  document.querySelectorAll("dialog:not(#confirmationDialog)").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeDialog(dialog); } }));
+  document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    if (dialog.dataset.requireChoice !== "true") closeDialog(dialog);
+  }));
   $("#itemDialog").addEventListener("close", () => { photoJob++; });
   $("#placeDialog").addEventListener("close", () => { photoJob++; });
   $("#itemForm").addEventListener("submit", submitItem);
@@ -613,13 +728,13 @@ function setup() {
   $("#itemPhoto").addEventListener("change", (event) => selectPhoto(event, "item"));
   $("#removePhoto").addEventListener("click", () => { photoJob++; itemPhoto = ""; itemPhotoChanged = true; $("#itemPhoto").value = ""; $("#itemFormSubmit").disabled = false; updatePhotoPreview("item", ""); });
   $("#quickPhoto").addEventListener("click", () => openPlace());
-  $("#photoInstead").addEventListener("click", () => { const room = $("#itemRoom").value, home = $("#itemHome").value; $("#itemDialog").close(); openPlace(room, home); });
+  $("#photoInstead").addEventListener("click", async () => { const room = $("#itemRoom").value, home = $("#itemHome").value; await closeDialog($("#itemDialog")); openPlace(room, home); });
   $("#placePhoto").addEventListener("change", (event) => selectPhoto(event, "place"));
   $("#removePlacePhoto").addEventListener("click", () => { photoJob++; placePhoto = ""; placePhotoChanged = true; $("#placePhoto").value = ""; $("#savePlace").disabled = false; updatePhotoPreview("place", ""); });
   $("#placeForm").addEventListener("submit", submitPlace);
-  $("#searchInput").addEventListener("input", () => { if ($("#searchInput").value.trim()) activeRoom = "All"; switchView("inventory"); renderInventory(); });
-  $("#roomFilter").addEventListener("change", (event) => { activeRoom = event.target.value; renderInventory(); });
-  $("#statusFilter").addEventListener("change", renderInventory);
+  $("#searchInput").addEventListener("input", () => { const wasTrip = activeView !== "inventory"; if ($("#searchInput").value.trim()) activeRoom = "All"; switchView("inventory", false); renderInventory(); rememberNavigation(!wasTrip); });
+  $("#roomFilter").addEventListener("change", (event) => { activeRoom = event.target.value; renderInventory(); rememberNavigation(); });
+  $("#statusFilter").addEventListener("change", () => { renderInventory(); rememberNavigation(true); });
   $("#clearFilters").addEventListener("click", clearFilters);
   $("#backToRooms").addEventListener("click", clearFilters);
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
@@ -630,8 +745,8 @@ function setup() {
   $("#exportData").addEventListener("click", exportData); $("#importData").addEventListener("change", importData);
   $("#signInButton").addEventListener("click", async () => { try { await firebaseService.signIn(); } catch (error) { updateSyncStatus({ mode: "error", message: `Could not sign in: ${error.message}` }); } });
   $("#signOutButton").addEventListener("click", async () => { try { await firebaseService.signOut(); } catch (error) { showToast(`Could not sign out: ${error.message}`); } });
-  $("#lightboxClose").addEventListener("click", () => $("#lightbox").close());
+  $("#lightboxClose").addEventListener("click", () => closeDialog($("#lightbox")));
   $("#toastUndo").addEventListener("click", () => { const action = undoAction; undoAction = null; if (action) action(); });
-  render(); startFirebase();
+  render(); setupNavigation(); startFirebase();
 }
 setup();

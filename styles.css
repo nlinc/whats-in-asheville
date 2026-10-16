@@ -1904,3 +1904,90 @@ summary>span,.optional {
     padding: 9px;
   }
 }
+
+/* Keep the keyboard outside the sheet, and the Save action outside its scroller. */
+#itemDialog[open],
+#placeDialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#itemDialog .dialog-heading,
+#placeDialog .dialog-heading,
+.form-footer,
+#photoInstead {
+  flex-shrink: 0;
+}
+#itemForm,
+#placeForm {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding: 16px;
+  padding: 3px 4px 14px;
+  margin: -3px -4px 0;
+}
+.form-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 8px;
+  background: var(--paper);
+}
+#photoInstead {
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .rail {
+    padding-top: calc(19px + env(safe-area-inset-top));
+  }
+  .main {
+    padding-bottom: max(22px, env(safe-area-inset-bottom));
+  }
+  .sheet {
+    position: fixed;
+    inset: auto 0 var(--keyboard-inset, 0px);
+    margin: 0 auto;
+    max-height: calc(var(--visible-height, 100dvh) - 12px);
+    overflow-y: auto;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  .keyboard-open .sheet {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .keyboard-open .dialog-heading {
+    margin-bottom: 14px;
+  }
+  .keyboard-open .dialog-heading .eyebrow,
+  .keyboard-open #photoInstead {
+    display: none;
+  }
+  .keyboard-open .dialog-heading h2 {
+    margin-top: 4px;
+    font-size: 22px;
+  }
+  .confirmation-sheet {
+    bottom: auto;
+    top: calc(var(--visible-top, 0px) + 12px);
+    border-radius: 18px;
+  }
+}
+@media (max-width: 760px) and (max-height: 500px) {
+  .sheet {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .dialog-heading {
+    margin-bottom: 14px;
+  }
+  .dialog-heading .eyebrow,
+  #photoInstead {
+    display: none;
+  }
+  .dialog-heading h2 {
+    margin-top: 4px;
+    font-size: 22px;
+  }
+}
