@@ -1,26 +1,33 @@
 # What’s where
 
-A small, local-first inventory for Nick and Christina’s Asheville condo and
-Morganton home. Opens on Asheville so “do we already have this?” is easy to answer
-while packing for the drive.
+A small shared memory for Nick and Christina: what is already in Asheville,
+and what needs to go in the car next time.
 
-- Search at the top, or tap a room to look around.
-- Add an item with a name and room; the home follows your current selection.
-  Shelf, quantity, notes, category, and status live under optional details.
-- Take a quick room/closet photo without listing every item. Photo notes are
-  searchable. Open a room to view or update its photo.
-- Swipe right for **Have it**, left for **Need it**; Undo is available afterwards.
-  The labeled status select offers the same actions plus Running low / Not sure.
-- **Bring & buy** includes low/missing/uncertain items and simple trip reminders.
-- **Settings & sharing** holds install instructions, Google sign-in, home names,
-  and backup import/export.
-- On iPhone, open in Safari → Share → Add to Home Screen. Leave Open as Web App
-  enabled if offered, then tap Add. On Android, use Install app in the browser
-  menu (or the install button in Settings when available).
-- Browser Back returns to the previous home/room/view and closes open forms.
-  In the Home Screen app, swipe right from the left edge to go back. Swiping
-  across the middle of an item still changes its status.
-- Forms fit above the phone keyboard, scroll their fields, and keep Save visible.
+- Choose **I’m in Morganton** to pack, or **I’m in Asheville** to save thoughts for
+  next time. The app remembers this choice on the device. Both show the same list.
+- Capture a reminder with one text field and Add. Optional **Speak** fills that
+  field for review; speech availability depends on the browser and may need an
+  online browser speech service. No audio is stored by this app. Phone keyboard
+  dictation is also available as a fallback.
+- Check things off as you pack. **Packed & done** keeps them available to uncheck.
+  Checking a box never changes what is saved as already in Asheville.
+- **Already in Asheville** opens searchable items and closet/room photos. Add an
+  item with just its name; room, shelf, quantity, notes, and category are optional.
+  Existing data for both homes remains under **Other homes & filters**. Older
+  other-home reminders remain available below the main packing list.
+- In Asheville, **Took home** marks an item to bring next time; **Here now** records
+  that it is present. Low/missing/uncertain items also appear on the packing list.
+- **Leaving Asheville?** offers a short checkpoint: save a reminder, record what
+  came home, or update a changed room photo. Only update what changed. A room’s
+  **Still looks right** action checks that particular photo. Dates never imply
+  that an unrelated save checked the whole inventory.
+- **Settings & sharing** holds Google sign-in, home names, backup import/export,
+  and Home Screen installation instructions.
+- On iPhone: Safari → Share → Add to Home Screen, leaving Open as Web App enabled
+  if offered. On Android use Install app in the browser menu or Settings button.
+- Browser Back returns to the previous view/room and closes forms. In the Home
+  Screen app, swipe right from the left edge. Middle-of-item swipes change status
+  with Undo. Forms scroll above the phone keyboard and keep Save visible.
 
 Vanilla HTML, CSS, and browser ES modules. No build, npm dependencies, or framework.
 Run `python3 -m http.server` from this folder and open the HTTP URL. See AGENTS.md

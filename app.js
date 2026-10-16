@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261016-pwa2";
+import { firebaseService } from "./firebase-client.js?v=20261016-simple6";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -6,14 +6,17 @@ const DIRTY_KEY = `${STORAGE_KEY}-has-local-changes`;
 const defaultHomes = [{ id: "asheville", name: "Asheville" }, { id: "morganton", name: "Morganton" }];
 const defaultRooms = ["Kitchen", "Bedroom", "Bathroom", "Closets & storage"];
 const categories = ["Other", "Food", "Paper goods", "Toiletries", "Linens", "Cleaning", "Appliances", "Tools", "Guest supplies", "Tech"];
-const statuses = { "In stock": "Have it", "Running low": "Running low", "Out": "Need it", "Unknown": "Not sure" };
+const statuses = { "In stock": "Have it", "Running low": "Running low", "Out": "Bring next time", "Unknown": "Not sure" };
 const $ = (selector) => document.querySelector(selector);
 let loadFailure = false;
 let state = loadState();
 let durableState = structuredClone(state);
+const LOCATION_KEY = `${STORAGE_KEY}-current-location`;
+let currentLocation = "morganton";
+try { if (localStorage.getItem(LOCATION_KEY) === "asheville") currentLocation = "asheville"; } catch { /* Preferences are optional. */ }
 let activeHome = "asheville";
 let activeRoom = "All";
-let activeView = "inventory";
+let activeView = "trip";
 let navigationDepth = 0;
 let navigationReady = false;
 let restoringNavigation = false;
@@ -46,7 +49,7 @@ function button(text, className, onClick, label) {
 // Give browser/phone back gestures real places to return to, without URL routing.
 function navigationSnapshot() {
   return { app: "whats-where", depth: navigationDepth, home: activeHome, room: activeRoom,
-    view: activeView, search: $("#searchInput").value, status: $("#statusFilter").value,
+    location: currentLocation, view: activeView, search: $("#searchInput").value, status: $("#statusFilter").value,
     dialogs: [...document.querySelectorAll("dialog[open]")].map((dialog) => dialog.id) };
 }
 function rememberNavigation(replace = false) {
@@ -59,6 +62,7 @@ function rememberNavigation(replace = false) {
   history[replace ? "replaceState" : "pushState"](next, "");
 }
 function showDialog(dialog) {
+  stopVoice();
   dialog.showModal();
   rememberNavigation();
 }
@@ -98,6 +102,7 @@ function setupNavigation() {
     }
     restoringNavigation = true;
     navigationDepth = next.depth || 0;
+    currentLocation = next.location === "asheville" ? "asheville" : "morganton";
     activeHome = next.home || "asheville";
     activeRoom = next.room || "All";
     $("#searchInput").value = next.search || "";
@@ -160,7 +165,7 @@ function confirmAction({ title, message, accept = "Continue", cancel = "Keep it"
   confirmationQueue = next.catch(() => {});
   return next;
 }
-function homeName(homeId) { return state.homes.find((home) => home.id === homeId)?.name || "Asheville"; }
+function homeName(homeId) { return state.homes.find((home) => home.id === homeId)?.name || defaultHomes.find((home) => home.id === homeId)?.name || "Asheville"; }
 function isHere(entry) { return activeHome === "All" || entry.homeId === activeHome; }
 function statusClass(status) { return status === "Out" ? "out" : status === "Running low" ? "low" : status === "Unknown" ? "unknown" : ""; }
 function safePhoto(value) {
@@ -180,7 +185,7 @@ function normalizeState(raw = {}) {
   const field = (value) => typeof value === "string" ? value : "";
   const items = raw.items.map((item) => {
     if (!item || typeof item.name !== "string" || !item.name.trim()) throw new Error("An item is missing its name.");
-    return { ...item, id: field(item.id) || id(), name: item.name.trim(), homeId: homeIds.has(item.homeId) ? item.homeId : "asheville", room: field(item.room).trim() || "Unsorted", category: categories.includes(item.category) ? item.category : "Other", status: Object.hasOwn(statuses, item.status) ? item.status : "Unknown", quantity: field(item.quantity), location: field(item.location), notes: field(item.notes), photo: safePhoto(item.photo) };
+    return { ...item, id: field(item.id) || id(), name: item.name.trim(), homeId: homeIds.has(item.homeId) ? item.homeId : "asheville", room: field(item.room).trim() || "Unsorted", category: categories.includes(item.category) ? item.category : "Other", status: Object.hasOwn(statuses, item.status) ? item.status : "Unknown", packedForTrip: Boolean(item.packedForTrip), checkedAt: field(item.checkedAt), quantity: field(item.quantity), location: field(item.location), notes: field(item.notes), photo: safePhoto(item.photo) };
   });
   const tasks = raw.tasks.map((task) => {
     if (!task || typeof task.text !== "string" || !task.text.trim()) throw new Error("A trip reminder is missing its text.");
@@ -188,7 +193,7 @@ function normalizeState(raw = {}) {
   });
   const places = (Array.isArray(raw.places) ? raw.places : []).map((place) => {
     if (!place || typeof place.name !== "string" || !place.name.trim()) throw new Error("A room photo is missing its location.");
-    return { id: field(place.id) || id(), name: place.name.trim(), homeId: homeIds.has(place.homeId) ? place.homeId : "asheville", photo: safePhoto(place.photo), notes: field(place.notes), updatedAt: field(place.updatedAt) };
+    return { ...place, checkedAt: field(place.checkedAt), photoUpdatedAt: field(place.photoUpdatedAt), id: field(place.id) || id(), name: place.name.trim(), homeId: homeIds.has(place.homeId) ? place.homeId : "asheville", photo: safePhoto(place.photo), notes: field(place.notes), updatedAt: field(place.updatedAt) };
   });
   for (const records of [items, tasks, places]) {
     if (new Set(records.map((record) => record.id)).size !== records.length) throw new Error("Duplicate record IDs in backup.");
@@ -321,22 +326,57 @@ function selectHome(homeId) {
   render();
   rememberNavigation();
 }
+function selectLocation(location) {
+  stopVoice();
+  currentLocation = location;
+  try { localStorage.setItem(LOCATION_KEY, location); } catch { /* Preferences are optional. */ }
+  activeHome = "asheville"; activeRoom = "All";
+  $("#searchInput").value = ""; $("#statusFilter").value = "All";
+  switchView("trip", false); render(); rememberNavigation();
+}
 function renderHomes() {
   if (activeHome !== "All" && !state.homes.some((home) => home.id === activeHome)) activeHome = "asheville";
   $("#homeNav").replaceChildren();
-  [...state.homes, { id: "All", name: "Both homes" }].forEach((home) => {
-    const el = button("", `home-button${activeHome === home.id ? " active" : ""}`, () => selectHome(home.id));
-    el.append(textNode("span", "", "home-dot"), textNode("span", home.name), textNode("span", "↗", "nav-arrow"));
-    el.setAttribute("aria-pressed", String(activeHome === home.id));
-    $("#homeNav").append(el);
+  ["morganton", "asheville"].forEach((homeId) => {
+    const el = button("", `home-button${currentLocation === homeId ? " active" : ""}`, () => selectLocation(homeId));
+    el.append(textNode("span", "", "home-dot"), textNode("span", `I’m in ${homeName(homeId)}`));
+    el.setAttribute("aria-pressed", String(currentLocation === homeId)); $("#homeNav").append(el);
   });
-  $("#homeEyebrow").textContent = activeHome === "All" ? "A little memory for both homes" : `The ${homeName(activeHome)} place`;
-  $("#heroDescription").textContent = activeHome === "All" ? `Find it in ${state.homes.map((home) => home.name).join(" or ")}. One less thing to remember.` : activeHome === "asheville" ? `Know what’s in ${homeName(activeHome)}. Leave the extra packing behind.` : `Know what’s in ${homeName(activeHome)}. Everything has its place.`;
-  const reminderHome = $("#taskHome").value;
-  fillHomeSelect($("#taskHome"), reminderHome || activeHome);
-  $("#taskHome").classList.toggle("hidden", activeHome !== "All");
-  $("#taskForm").classList.toggle("both-homes", activeHome === "All");
+  const atCondo = currentLocation === "asheville";
+  $("#main").classList.toggle("at-asheville", atCondo);
+  $("#memoryTab").textContent = activeHome === "All" ? "Saved in both homes" : `Already in ${homeName(activeHome)}`;
+  $("#homeEyebrow").textContent = `You’re in ${homeName(currentLocation)}`;
+  const title = $("#todayHeading");
+  title.replaceChildren(document.createTextNode(atCondo ? "Remember for " : "Pack for "), textNode("em", atCondo ? "next time." : `${homeName("asheville")}.`));
+  $("#heroDescription").textContent = atCondo ? "Notice it. Save it. It’ll be on your list when you pack." : "What to bring. What’s already there. Less to remember.";
+  $("#todayTab").firstChild.textContent = atCondo ? "Next time " : "Packing list ";
+  $("#leavingAsheville").classList.toggle("hidden", !atCondo);
+  $("#leavingAsheville").textContent = `Leaving ${homeName("asheville")}? →`;
+  $("#captureLabel").textContent = atCondo ? "What do we need next time?" : "What needs to go in the car?";
+  $("#packingHeading").textContent = atCondo ? "Bring next time" : "Into the car";
+  $("#packingHelp").textContent = atCondo ? "Add it now. It’ll be here when you pack." : "Check it off once it’s in the car.";
+  $("#updateMemory").classList.toggle("hidden", !atCondo);
+  const memorySelect = $("#memoryHome");
+  memorySelect.replaceChildren(...state.homes.map((home) => new Option(home.name, home.id)), new Option("Both homes", "All")); memorySelect.value = activeHome;
   $("#roomSuggestions").replaceChildren(...[...new Set([...defaultRooms, ...state.items.filter(isHere).map((item) => item.room), ...state.places.filter(isHere).map((place) => place.name)])].map((room) => new Option(room)));
+}
+function savedDate(value, prefix = "Saved") {
+  const date = new Date(value);
+  return !value || Number.isNaN(date.getTime()) ? "Not checked yet" : `${prefix} ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date)}`;
+}
+function placeFreshness(place) {
+  if (!place) return "No photo yet";
+  return place.checkedAt ? savedDate(place.checkedAt, "Checked") : savedDate(place.photoUpdatedAt || place.updatedAt, "Photo saved");
+}
+async function checkPlace(placeId) {
+  const place = state.places.find((entry) => entry.id === placeId); if (!place) return;
+  place.checkedAt = new Date().toISOString();
+  savedMessage(await saveState(), "This space is still up to date.");
+}
+function showMemory(focus = false) {
+  activeHome = "asheville"; activeRoom = "All"; $("#statusFilter").value = "All"; $("#searchInput").value = "";
+  render(); switchView("inventory");
+  if (focus) $("#searchInput").focus();
 }
 // Drawings are static, code-native assets; no household content enters SVG markup.
 const roomPaths = {
@@ -395,6 +435,7 @@ function renderRooms() {
     open.append(textNode("span", entry.name, "room-title"), textNode("span", `${activeHome === "All" ? `${homeName(entry.homeId)} · ` : ""}${entry.count === 0 && entry.place?.photo ? "Photo memory" : `${entry.count} ${entry.count === 1 ? "item" : "items"}${entry.place?.photo ? " · photo" : ""}`}`, "room-count"), textNode("span", "↗", "room-arrow"));
     const photoAction = button("", "room-add-photo", () => openPlace(entry.name, entry.homeId), `${entry.place?.photo ? "Update" : "Add"} photo of ${entry.name}`);
     photoAction.append(cameraIcon());
+    if (entry.place?.photo) open.append(textNode("span", placeFreshness(entry.place), "memory-date"));
     card.append(open, photoAction);
     $("#roomGrid").append(card);
   });
@@ -411,6 +452,10 @@ function renderRooms() {
     } else card.append(roomArt(activeRoom));
     const info = textNode("div", "");
     info.append(textNode("p", homeName(activeHome), "eyebrow"), textNode("h2", activeRoom), textNode("p", place?.notes || "A photo is an easy way to remember what’s in here."), button(place?.photo ? "Update room photo ↗" : "▧ Take a quick photo", "text-button", () => openPlace(activeRoom)));
+    if (place?.photo) {
+      info.append(textNode("p", placeFreshness(place), "memory-date"));
+      if (currentLocation === "asheville" && place.homeId === "asheville") info.append(button("Still looks right ✓", "text-button", () => checkPlace(place.id)));
+    }
     card.append(info); $("#roomOverview").append(card);
   }
 }
@@ -439,11 +484,13 @@ function renderInventory() {
     else thumb.textContent = item.name.slice(0, 1).toLocaleLowerCase();
     const copy = textNode("div", "", "item-copy");
     copy.append(button(item.name, "item-name", () => editItem(item.id)), textNode("p", metaText(item), "item-meta"));
+    copy.append(textNode("p", savedDate(item.checkedAt || item.updatedAt, item.checkedAt ? "Checked" : "Saved"), "memory-date"));
     if (item.notes) copy.append(textNode("p", item.notes, "item-notes"));
-    const status = document.createElement("select"); status.className = `item-status ${statusClass(item.status)}`; status.setAttribute("aria-label", `Status of ${item.name}`);
-    Object.entries(statuses).forEach(([value, label]) => status.append(new Option(label, value))); status.value = item.status;
-    status.addEventListener("change", () => updateStatus(item.id, status.value));
-    card.append(thumb, copy, status, button("···", "edit-button", () => editItem(item.id), `More options for ${item.name}`));
+    const status = textNode("span", statuses[item.status], `item-status ${statusClass(item.status)}`);
+    card.append(thumb, copy, status);
+    if (currentLocation === "asheville" && item.homeId === "asheville") {
+      card.append(button(item.status === "In stock" ? "Took home" : item.status === "Running low" ? "Restocked" : "Here now", "text-button item-maintain", () => updateStatus(item.id, item.status === "In stock" ? "Out" : "In stock")));
+    } else card.append(button("···", "edit-button", () => editItem(item.id), `More options for ${item.name}`));
     setupSwipe(card, item.id); shell.append(underlay, card); $("#inventoryList").append(shell);
   });
   // Photo-only rooms also participate in search, without inventing item records.
@@ -492,16 +539,19 @@ async function updateStatus(itemId, status) {
   const item = state.items.find((entry) => entry.id === itemId);
   if (!item || status === item.status) return;
   const previous = item.status;
-  item.status = status; item.updatedAt = new Date().toISOString();
+  const previousPacked = item.packedForTrip;
+  const previousChecked = item.checkedAt;
+  item.status = status; item.packedForTrip = false; item.checkedAt = new Date().toISOString(); item.updatedAt = item.checkedAt;
   const saved = await saveState();
   if (saved === null) return;
   showToast(saved ? `${item.name}: ${statuses[status].toLowerCase()}` : "Saved on this device. Check sharing in settings.", async () => {
     const current = state.items.find((entry) => entry.id === itemId);
-    if (current && current.status === status) { current.status = previous; current.updatedAt = new Date().toISOString(); savedMessage(await saveState(), "Undone."); }
+    if (current && current.status === status) { current.status = previous; current.packedForTrip = previousPacked; current.checkedAt = previousChecked; current.updatedAt = new Date().toISOString(); savedMessage(await saveState(), "Undone."); }
   });
 }
 function clearFilters() { activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All"; renderInventory(); rememberNavigation(); }
 function switchView(view, remember = true) {
+  if (activeView !== view) stopVoice();
   activeView = view;
   document.querySelectorAll(".tab").forEach((tab) => { tab.classList.toggle("active", tab.dataset.view === view); tab.setAttribute("aria-pressed", String(tab.dataset.view === view)); });
   document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `${view}View`));
@@ -509,17 +559,16 @@ function switchView(view, remember = true) {
 }
 function render() {
   renderHomes(); renderInventory(); renderTasks();
-  const pending = state.tasks.filter((task) => isHere(task) && !task.done).length + state.items.filter((item) => isHere(item) && item.status !== "In stock").length;
-  $("#tripTaskCount").textContent = pending;
   const date = new Date(state.updatedAt);
   $("#lastUpdated").textContent = Number.isNaN(date.getTime()) ? "" : `Updated ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date)}`;
 }
 function openItem() {
   editingItemId = null; itemPhoto = ""; itemPhotoChanged = false; photoJob++;
   $("#itemForm").reset(); $("#itemFormSubmit").disabled = false; $("#itemFormError").textContent = ""; $("#itemDetails").open = false;
-  $("#formHeading").textContent = "Remember this."; $("#itemFormSubmit").textContent = "Save item";
+  $("#formHeading").textContent = "What’s already here?"; $("#itemFormSubmit").textContent = "Save item";
   $("#deleteEditingItem").classList.add("hidden");
   fillHomeSelect($("#itemHome"), activeHome);
+  $("#itemStatusLabel").textContent = `Is it in ${homeName($("#itemHome").value)}?`;
   $("#itemRoom").value = activeRoom === "All" ? "" : activeRoom;
   updatePhotoPreview("item", "");
   showDialog($("#itemDialog"));
@@ -527,10 +576,11 @@ function openItem() {
 function editItem(itemId) {
   const item = state.items.find((entry) => entry.id === itemId); if (!item) return;
   openItem(); editingItemId = itemId;
-  $("#formHeading").textContent = "Right where it belongs.";
+  $("#formHeading").textContent = item.name;
   $("#itemFormSubmit").textContent = "Save changes";
   $("#deleteEditingItem").classList.remove("hidden");
   for (const [field, selector] of Object.entries({ name: "#itemName", homeId: "#itemHome", room: "#itemRoom", category: "#itemCategory", status: "#itemStatus", quantity: "#itemQuantity", location: "#itemLocation", notes: "#itemNotes" })) $(selector).value = item[field] || "";
+  $("#itemStatusLabel").textContent = `Is it in ${homeName(item.homeId)}?`;
   itemPhoto = item.photo; updatePhotoPreview("item", itemPhoto);
 }
 function updatePhotoPreview(kind, photo) {
@@ -590,7 +640,7 @@ async function submitItem(event) {
   $("#itemFormSubmit").disabled = true; $("#itemFormError").textContent = "";
   try {
     const photo = await cloudPhoto(itemPhoto, itemPhotoChanged, recordId);
-    const item = { ...oldItem, id: recordId, name, homeId: form.get("homeId"), room: form.get("room").trim() || "Unsorted", category: form.get("category"), status: form.get("status"), quantity: form.get("quantity").trim(), location: form.get("location").trim(), notes: form.get("notes").trim(), photo, updatedAt: new Date().toISOString() };
+    const item = { ...oldItem, id: recordId, name, homeId: form.get("homeId"), room: form.get("room").trim() || "Unsorted", category: form.get("category"), status: form.get("status"), quantity: form.get("quantity").trim(), location: form.get("location").trim(), notes: form.get("notes").trim(), photo, packedForTrip: oldItem?.status === form.get("status") && oldItem?.homeId === form.get("homeId") ? oldItem.packedForTrip : false, checkedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     if (oldItem) state.items = state.items.map((entry) => entry.id === recordId ? item : entry); else state.items.unshift(item);
     const saved = await saveState();
     if (saved === null) { $("#itemFormError").textContent = "Device storage is full. Your item was not saved. Export a backup in settings."; return; }
@@ -630,7 +680,10 @@ async function submitPlace(event) {
   try {
     const recordId = existing?.id || id();
     const photo = await cloudPhoto(placePhoto, placePhotoChanged, recordId);
-    const place = { id: recordId, homeId, name, photo, notes: $("#placeNotes").value.trim(), updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const place = { ...existing, id: recordId, homeId, name, photo, notes: $("#placeNotes").value.trim(), updatedAt: now,
+      photoUpdatedAt: placePhotoChanged ? now : existing?.photoUpdatedAt || existing?.updatedAt || "",
+      checkedAt: placePhotoChanged ? now : existing?.checkedAt || "" };
     // Renaming a photographed room moves its items along with it.
     if (existing && (existing.name !== name || existing.homeId !== homeId)) state.items = state.items.map((item) => item.homeId === existing.homeId && item.room === existing.name ? { ...item, homeId, room: name } : item);
     if (existing) state.places = state.places.map((entry) => entry.id === recordId ? place : entry); else state.places.push(place);
@@ -652,41 +705,115 @@ function openLightbox(entry) {
   $("#lightboxNotes").textContent = entry.notes || "";
   showDialog($("#lightbox"));
 }
-function renderTasks() {
-  $("#attentionList").replaceChildren();
-  state.items.filter((item) => isHere(item) && item.status !== "In stock").forEach((item) => {
-    const row = textNode("article", "", "attention-item");
-    const copy = textNode("div", "", "attention-copy"); copy.append(textNode("strong", item.name), textNode("p", `${statuses[item.status]} · ${homeName(item.homeId)} · ${item.room}`));
-    row.append(copy, button("Have it ✓", "secondary-button", () => updateStatus(item.id, "In stock"), `Mark ${item.name} as have it`));
-    $("#attentionList").append(row);
-  });
-  $("#taskColumns").replaceChildren();
-  ["Bring", "Buy", "Check"].forEach((type) => {
-    const column = textNode("section", "", "task-column"); column.append(textNode("h3", type));
-    const tasks = state.tasks.filter((task) => isHere(task) && task.type === type);
-    if (!tasks.length) column.append(textNode("p", "Nothing to remember here.", "task-empty"));
-    tasks.forEach((task) => {
-      const row = textNode("div", "", `task-item${task.done ? " done" : ""}`);
-      const label = document.createElement("label"); const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = task.done;
-      checkbox.addEventListener("change", async () => { task.done = checkbox.checked; await saveState(); });
-      label.append(checkbox, textNode("span", `${task.text}${activeHome === "All" ? ` · ${homeName(task.homeId)}` : ""}`));
-      row.append(label, button("×", "close-button", async () => { state.tasks = state.tasks.filter((entry) => entry.id !== task.id); await saveState(); }, `Delete reminder: ${task.text}`)); column.append(row);
+// One destination list follows you between homes. Packing never claims arrival.
+function tripNeeds() { return state.items.filter((item) => item.homeId === "asheville" && item.status !== "In stock"); }
+async function setPacked(entry, isItem, done) {
+  if (isItem) entry.packedForTrip = done; else entry.done = done;
+  savedMessage(await saveState(), done ? "Checked off. What’s already in Asheville is unchanged." : "Back on your list.");
+}
+function reminderRow(entry, isItem = false) {
+  const done = isItem ? entry.packedForTrip : entry.done;
+  const row = textNode("div", "", `packing-row${done ? " done" : ""}`);
+  const label = document.createElement("label");
+  const check = document.createElement("input"); check.type = "checkbox"; check.checked = done;
+  const name = isItem ? `${entry.status === "Unknown" ? "Check: " : ""}${entry.name}` : `${entry.type !== "Bring" ? `${entry.type}: ` : ""}${entry.text}`;
+  check.setAttribute("aria-label", `${done ? "Uncheck" : "Check off"} ${name}`);
+  check.addEventListener("change", () => setPacked(entry, isItem, check.checked));
+  const copy = textNode("span", "", "packing-copy"); copy.append(textNode("span", name));
+  if (isItem) copy.append(textNode("small", `${entry.room} · ${statuses[entry.status]}`));
+  else if (entry.homeId !== "asheville") copy.append(textNode("small", homeName(entry.homeId)));
+  label.append(check, copy); row.append(label);
+  if (isItem) {
+    if (currentLocation === "asheville") row.append(button(entry.status === "Running low" ? "Restocked" : "Here now", "text-button", () => updateStatus(entry.id, "In stock"), `${entry.name} ${entry.status === "Running low" ? "is restocked" : "is now in Asheville"}`));
+    else row.append(button("···", "edit-button", () => editItem(entry.id), `Edit ${entry.name}`));
+  } else row.append(button("×", "close-button", async () => {
+    const index = state.tasks.indexOf(entry); state.tasks = state.tasks.filter((task) => task.id !== entry.id);
+    const saved = await saveState(); if (saved === null) return;
+    showToast(saved ? "Reminder removed." : "Saved on this device. Check sharing in settings.", async () => {
+      if (!state.tasks.some((task) => task.id === entry.id)) { state.tasks.splice(index, 0, entry); savedMessage(await saveState(), "Reminder restored."); }
     });
-    $("#taskColumns").append(column);
-  });
+  }, `Remove reminder: ${entry.text}`));
+  return row;
+}
+function renderTasks() {
+  const tasks = state.tasks.filter((task) => task.homeId === "asheville");
+  const needs = tripNeeds();
+  const pending = [...needs.filter((item) => !item.packedForTrip).map((entry) => reminderRow(entry, true)), ...tasks.filter((task) => !task.done).map((entry) => reminderRow(entry))];
+  const completed = [...needs.filter((item) => item.packedForTrip).map((entry) => reminderRow(entry, true)), ...tasks.filter((task) => task.done).map((entry) => reminderRow(entry))];
+  $("#packingList").replaceChildren(...pending); $("#completedList").replaceChildren(...completed);
+  $("#tripTaskCount").textContent = pending.length;
+  $("#packingCount").textContent = pending.length ? `${pending.length} to remember` : "";
+  $("#emptyPacking").classList.toggle("hidden", Boolean(pending.length));
+  $("#completedPacking").classList.toggle("hidden", !completed.length);
+  $("#completedSummary").textContent = `Packed & done (${completed.length})`;
+  const others = state.tasks.filter((task) => task.homeId !== "asheville");
+  $("#otherReminders").classList.toggle("hidden", !others.length); $("#otherRemindersList").replaceChildren(...others.map((entry) => reminderRow(entry)));
 }
 async function addTask(event) {
-  event.preventDefault(); const text = $("#taskText").value.trim(); if (!text) return;
-  state.tasks.unshift({ id: id(), text, type: $("#taskType").value, done: false, homeId: activeHome === "All" ? $("#taskHome").value : activeHome });
-  $("#taskText").value = ""; savedMessage(await saveState(), "Added to your list.");
+  event.preventDefault(); stopVoice();
+  const text = $("#taskText").value.trim(); if (!text) return;
+  const existing = state.tasks.find((task) => task.homeId === "asheville" && task.text.toLocaleLowerCase() === text.toLocaleLowerCase());
+  if (existing) existing.done = false;
+  else state.tasks.unshift({ id: id(), text, type: "Bring", done: false, homeId: "asheville" });
+  const saved = await saveState();
+  if (saved !== null) { $("#taskText").value = ""; savedMessage(saved, "On your next-trip list."); }
 }
 async function copyChecklist() {
-  const tasks = state.tasks.filter((task) => isHere(task) && !task.done);
-  const attention = state.items.filter((item) => isHere(item) && item.status !== "In stock");
-  const lines = [...attention.map((item) => `- [ ] ${item.status === "Unknown" ? "Check" : "Bring or buy"} ${item.name} (${homeName(item.homeId)} · ${item.room})`), ...tasks.map((task) => `- [ ] ${task.type}: ${task.text}${activeHome === "All" ? ` (${homeName(task.homeId)})` : ""}`)];
-  if (!lines.length) { showToast("Nothing on your trip list. Travel light."); return; }
-  try { await navigator.clipboard.writeText(`${activeHome === "All" ? "Both homes" : homeName(activeHome)} · Trip list\n\n${lines.join("\n")}`); showToast("Trip list copied."); }
+  const tasks = state.tasks.filter((task) => task.homeId === "asheville" && !task.done);
+  const lines = [...tripNeeds().filter((item) => !item.packedForTrip).map((item) => `- [ ] ${item.status === "Unknown" ? "Check: " : ""}${item.name}`), ...tasks.map((task) => `- [ ] ${task.type !== "Bring" ? `${task.type}: ` : ""}${task.text}`)];
+  if (!lines.length) { showToast("Nothing left on your packing list."); return; }
+  try { await navigator.clipboard.writeText(`Bring to ${homeName("asheville")}
+
+${lines.join("\n")}`); showToast("Packing list copied."); }
   catch { showToast("Copy wasn’t available. Try from your usual browser."); }
+}
+// Browser speech is optional and only starts on a deliberate tap. Review then Add.
+let voiceSession = null;
+let voiceTimer;
+function stopVoice() {
+  const session = voiceSession; voiceSession = null; clearTimeout(voiceTimer);
+  if (session) { try { session.abort(); } catch { /* Already ended. */ } }
+  if (session && $("#voiceStatus").textContent.startsWith("Listening")) $("#voiceStatus").textContent = "Voice stopped. Type a thought or tap Speak.";
+  const control = $("#voiceCapture"); control.textContent = "Speak"; control.setAttribute("aria-pressed", "false");
+}
+function setupVoice() {
+  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const control = $("#voiceCapture"), status = $("#voiceStatus");
+  if (!Speech) {
+    control.classList.add("hidden"); status.textContent = "Type a thought, or use your phone keyboard’s microphone."; return;
+  }
+  control.addEventListener("click", () => {
+    if (voiceSession) { voiceSession.stop(); return; }
+    let session;
+    try { session = new Speech(); }
+    catch { status.textContent = "Voice isn’t available here. Use your keyboard’s microphone or type."; return; }
+    voiceSession = session;
+    session.lang = navigator.language || "en-US"; session.continuous = false; session.interimResults = false;
+    const original = $("#taskText").value.trim();
+    control.textContent = "Stop"; control.setAttribute("aria-pressed", "true");
+    status.textContent = "Listening… say one reminder. Your browser may use an online speech service.";
+    let received = false, failed = false;
+    session.onresult = (event) => {
+      if (voiceSession !== session) return;
+      const transcript = Array.from(event.results).filter((result) => result.isFinal).map((result) => result[0].transcript).join(" ").trim();
+      if (!transcript) return;
+      received = true; $("#taskText").value = [original, transcript].filter(Boolean).join(" ").slice(0, 500);
+      status.textContent = "Check the words, then tap Add.";
+    };
+    session.onerror = (event) => {
+      if (voiceSession !== session) return;
+      failed = true; status.textContent = ["not-allowed", "service-not-allowed"].includes(event.error) ? "Microphone unavailable. Type here or use your keyboard’s microphone." : "Couldn’t hear that. Try again, type, or use your keyboard’s microphone.";
+    };
+    session.onend = () => {
+      if (voiceSession !== session) return;
+      stopVoice();
+      if (!received && !failed) status.textContent = "No words captured. Try again or use your keyboard’s microphone.";
+    };
+    try { session.start(); voiceTimer = setTimeout(() => { if (voiceSession === session) { stopVoice(); status.textContent = "Voice stopped. You can type or try again."; } }, 20000); }
+    catch { stopVoice(); status.textContent = "Voice isn’t available here. Use your keyboard’s microphone or type."; }
+  });
+  $("#taskText").addEventListener("input", stopVoice);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState !== "visible") stopVoice(); });
 }
 function openSettings() {
   $("#homeFields").replaceChildren(...state.homes.map((home) => {
@@ -724,10 +851,12 @@ function setup() {
   $("#itemDialog").addEventListener("close", () => { photoJob++; });
   $("#placeDialog").addEventListener("close", () => { photoJob++; });
   $("#itemForm").addEventListener("submit", submitItem);
+  $("#itemHome").addEventListener("change", () => { $("#itemStatusLabel").textContent = `Is it in ${homeName($("#itemHome").value)}?`; });
   $("#deleteEditingItem").addEventListener("click", deleteItem);
   $("#itemPhoto").addEventListener("change", (event) => selectPhoto(event, "item"));
   $("#removePhoto").addEventListener("click", () => { photoJob++; itemPhoto = ""; itemPhotoChanged = true; $("#itemPhoto").value = ""; $("#itemFormSubmit").disabled = false; updatePhotoPreview("item", ""); });
   $("#quickPhoto").addEventListener("click", () => openPlace());
+  $("#memoryPhoto").addEventListener("click", () => openPlace());
   $("#photoInstead").addEventListener("click", async () => { const room = $("#itemRoom").value, home = $("#itemHome").value; await closeDialog($("#itemDialog")); openPlace(room, home); });
   $("#placePhoto").addEventListener("change", (event) => selectPhoto(event, "place"));
   $("#removePlacePhoto").addEventListener("click", () => { photoJob++; placePhoto = ""; placePhotoChanged = true; $("#placePhoto").value = ""; $("#savePlace").disabled = false; updatePhotoPreview("place", ""); });
@@ -740,6 +869,15 @@ function setup() {
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   $("#taskForm").addEventListener("submit", addTask);
   $("#copyChecklist").addEventListener("click", copyChecklist);
+  $("#memoryHome").addEventListener("change", (event) => selectHome(event.target.value));
+  $("#checkMemory").addEventListener("click", () => showMemory());
+  $("#updateMemory").addEventListener("click", () => showMemory());
+  $("#leavingAsheville").addEventListener("click", () => showDialog($("#departureDialog")));
+  $("#departureReminder").addEventListener("click", async () => { await closeDialog($("#departureDialog")); switchView("trip"); $("#taskText").focus(); });
+  $("#departureItems").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(true); showToast("Find what you took home, then tap Took home."); });
+  $("#departurePhoto").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(); showToast("Tap the camera on the space that changed, or add a new photo."); });
+  $("#finishDeparture").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showToast("Ready for next time. Your list is saved."); });
+  setupVoice();
   $("#openSettings").addEventListener("click", openSettings);
   $("#homesForm").addEventListener("submit", async (event) => { event.preventDefault(); const form = new FormData(event.target); const names = state.homes.map((home) => String(form.get(home.id)).trim()); if (names.some((name) => !name)) return; state.homes.forEach((home, i) => { home.name = names[i]; }); savedMessage(await saveState(), "Place names saved."); });
   $("#exportData").addEventListener("click", exportData); $("#importData").addEventListener("change", importData);
@@ -747,6 +885,6 @@ function setup() {
   $("#signOutButton").addEventListener("click", async () => { try { await firebaseService.signOut(); } catch (error) { showToast(`Could not sign out: ${error.message}`); } });
   $("#lightboxClose").addEventListener("click", () => closeDialog($("#lightbox")));
   $("#toastUndo").addEventListener("click", () => { const action = undoAction; undoAction = null; if (action) action(); });
-  render(); setupNavigation(); startFirebase();
+  render(); switchView("trip", false); setupNavigation(); startFirebase();
 }
 setup();

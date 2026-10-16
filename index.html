@@ -8,22 +8,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="What's where">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>What's where · Home inventory</title>
+    <title>What's where · A little less to remember</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20261016-pwa2">
+    <link rel="stylesheet" href="styles.css?v=20261016-simple6">
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to inventory</a>
+    <a class="skip-link" href="#main">Skip to today</a>
     <div class="app-layout">
       <aside class="rail">
         <a class="wordmark" href="./" aria-label="What's where home"><span class="brand-mark" aria-hidden="true">w<span>↗</span></span><span>what’s<br>where<span class="brand-period">.</span></span></a>
         <div class="places-nav">
           <p class="eyebrow">
-            Your places
+            I’m in
           </p>
-          <nav id="homeNav" aria-label="Choose a home">
+          <nav id="homeNav" aria-label="Where are you?">
           </nav>
         </div>
         <div class="rail-note">
@@ -41,37 +41,32 @@
       </aside>
       <main id="main" class="main">
         <header class="page-top">
-          <span class="eyebrow" id="homeEyebrow">The Asheville place</span><button class="primary-button add-button" id="jumpToAddItem" type="button"><span aria-hidden="true">+</span> Add item</button>
+          <span class="eyebrow" id="homeEyebrow">Packing at home</span>
+          <button id="leavingAsheville" class="text-button hidden" type="button">Leaving Asheville? →</button>
         </header>
-        <section class="hero">
-          <p class="hero-kicker">
-            A little space in your head.
-          </p>
-          <h1>
-            It’s already <em>there.</em>
-          </h1>
-          <p id="heroDescription">
-            Know what’s in Asheville. Leave the extra packing behind.
-          </p>
-          <div class="hero-sketch" aria-hidden="true">
-            <svg viewBox="0 0 190 140" fill="none"><path d="M15 120h160M44 119V46l51-31 51 31v73M32 53l63-38 63 38M78 119V79h34v40M52 61h14v18H52zM124 61h14v18h-14z"/><path d="M19 103c-15-25 17-37 17-17 0 8-6 13-6 13M30 118V91M163 118V83m-8 16c-17-16 1-31 8-16 10-24 28-5 9 10"/><path class="sketch-sun" d="M164 24v-8m0 33v-8m-9-9h-8m34 0h-8m-16-7-6-6m25 25-6-6m-14 0-6 6m25-25-6 6"/></svg><span>less stuff. more weekend.</span>
-          </div>
+        <section class="hero simple-hero">
+          <h1 id="todayHeading">Pack for <em>Asheville.</em></h1>
+          <p id="heroDescription">A little less to remember. A little less to bring.</p>
         </section>
-        <div class="search-bar">
-          <span aria-hidden="true">⌕</span><input id="searchInput" type="search" aria-label="Find an item or place" placeholder="Do we have a…" autocomplete="off"><span class="search-hint">Let’s find it.</span>
-        </div>
-        <nav class="view-tabs" aria-label="Views">
-          <button class="tab active" data-view="inventory" type="button" aria-pressed="true">What’s here</button><button class="tab" data-view="trip" type="button" aria-pressed="false">Bring & buy <span id="tripTaskCount" class="tab-count">0</span></button>
+        <nav class="view-tabs" aria-label="What do you need?">
+          <button class="tab active" data-view="trip" type="button" aria-pressed="true" id="todayTab">Packing list <span id="tripTaskCount" class="tab-count">0</span></button>
+          <button class="tab" data-view="inventory" type="button" aria-pressed="false" id="memoryTab">Already in Asheville</button>
         </nav>
-        <section id="inventoryView" class="view active" aria-label="Inventory">
+        <section id="inventoryView" class="view" aria-label="Inventory">
+          <div class="memory-top">
+            <div class="search-bar">
+              <span aria-hidden="true">⌕</span><input id="searchInput" type="search" aria-label="What is already here?" placeholder="Do we already have a…" autocomplete="off">
+            </div>
+            <div class="memory-actions"><button id="jumpToAddItem" class="secondary-button" type="button">+ Remember an item</button><button id="memoryPhoto" class="text-button" type="button">Take a photo</button></div>
+          </div>
           <section id="roomsSection">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">
-                  A place for everything
+                  The photos remember for you
                 </p>
                 <h2>
-                  Take a look around.
+                  A quick look inside.
                 </h2>
               </div>
               <button class="text-button" id="quickPhoto" type="button"><span aria-hidden="true">▧</span> Quick photo</button>
@@ -99,7 +94,7 @@
               </div>
               <span id="resultCount" class="count-label"></span>
             </div>
-            <div class="filters">
+            <details class="memory-filters"><summary>Other homes & filters</summary><div class="filters"><label class="sr-only" for="memoryHome">Saved home</label><select id="memoryHome" aria-label="Saved home"></select>
               <label class="sr-only" for="roomFilter">
                 Room filter
               </label>
@@ -108,7 +103,7 @@
                 Status filter
               </label>
               <select id="statusFilter"><option value="All">Any status</option><option value="In stock">Have it</option><option value="Running low">Running low</option><option value="Out">Need it</option><option value="Unknown">Not sure</option></select><button id="clearFilters" class="text-button hidden" type="button">Clear</button>
-            </div>
+            </div></details>
             <p class="swipe-hint" id="swipeHint">
               Swipe an item: <span>← need it</span><span>have it →</span>
             </p>
@@ -126,41 +121,38 @@
             </div>
           </section>
         </section>
-        <section id="tripView" class="view" aria-label="Bring and buy">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">
-                For the hour up the road
-              </p>
-              <h2>
-                A little list for the trip.
-              </h2>
+        <section id="tripView" class="view active" aria-label="Packing and next time">
+          <form id="taskForm" class="capture-form">
+            <label id="captureLabel" for="taskText">What needs to go in the car?</label>
+            <div class="capture-input">
+              <input id="taskText" type="text" placeholder="Coffee, chargers, hiking boots…" required maxlength="500" autocomplete="off" enterkeyhint="done">
+              <button id="voiceCapture" class="voice-button" type="button" aria-pressed="false" aria-label="Speak a reminder">Speak</button>
+              <button class="primary-button" type="submit">Add</button>
             </div>
-            <button id="copyChecklist" class="secondary-button" type="button">Copy list</button>
-          </div>
-          <p class="section-intro">
-            Low or missing things show up here. Add anything else you want to remember.
-          </p>
-          <div id="attentionList" class="attention-list">
-          </div>
-          <form id="taskForm" class="task-form">
-            <label class="sr-only" for="taskText">
-              Something to remember
-            </label>
-            <input id="taskText" type="text" placeholder="Something to remember…" required>
-            <label class="sr-only" for="taskType">
-              Task type
-            </label>
-            <select id="taskType"><option value="Bring">Bring</option><option value="Buy">Buy</option><option value="Check">Check</option></select><select id="taskHome" class="hidden" aria-label="Home for reminder"></select><button class="primary-button" type="submit">Add</button>
+            <p id="voiceStatus" class="capture-help" role="status">A thought now. Remembered next time.</p>
           </form>
-          <div id="taskColumns" class="task-columns">
-          </div>
+          <div class="packing-heading"><h2 id="packingHeading">Into the car</h2><span id="packingCount" class="count-label"></span></div>
+          <p id="packingHelp" class="section-intro">Check it off once it’s in the car.</p>
+          <div id="packingList" class="packing-list"></div>
+          <p id="emptyPacking" class="packing-empty hidden">Nothing to bring yet. Add it the moment you think of it.</p>
+          <details id="completedPacking" class="completed-packing"><summary id="completedSummary">Packed & done</summary><div id="completedList" class="packing-list"></div></details>
+          <details id="otherReminders" class="completed-packing hidden"><summary>Saved reminders for other homes</summary><div id="otherRemindersList" class="packing-list"></div></details>
+          <button id="checkMemory" class="memory-link" type="button"><span>Do we already have it?</span><small>Look at what’s in Asheville before packing more.</small><span aria-hidden="true">↗</span></button>
+          <div class="packing-tools"><button id="copyChecklist" class="text-button" type="button">Copy list</button><button id="updateMemory" class="text-button hidden" type="button">Update what’s here →</button></div>
         </section>
         <footer class="page-footer">
           <span>A home for the things you forget.</span><span id="lastUpdated"></span>
         </footer>
       </main>
     </div>
+    <dialog id="departureDialog" class="sheet departure-sheet" aria-labelledby="departureHeading">
+      <div class="dialog-heading"><div><p class="eyebrow">Before you head home</p><h2 id="departureHeading">Anything changed?</h2></div><button class="close-button" data-close="departureDialog" type="button" aria-label="Close departure check">×</button></div>
+      <p class="muted">Only the changes. You don’t have to check everything.</p>
+      <button id="departureReminder" class="departure-action" type="button"><strong>We need something next time</strong><span>Add a quick reminder →</span></button>
+      <button id="departureItems" class="departure-action" type="button"><strong>We took something home</strong><span>Find it and tap “Took home” →</span></button>
+      <button id="departurePhoto" class="departure-action" type="button"><strong>A closet or cabinet changed</strong><span>Update its photo →</span></button>
+      <button id="finishDeparture" class="primary-button" type="button">All set for next time</button>
+    </dialog>
     <dialog id="itemDialog" class="sheet" aria-labelledby="formHeading">
       <div class="dialog-heading">
         <div>
@@ -177,16 +169,7 @@
         <label>
           Item<input id="itemName" name="name" autofocus placeholder="Phone charger, hiking boots…" required maxlength="200" autocomplete="off">
         </label>
-        <div class="field-row">
-          <label>
-            Home<select id="itemHome" name="homeId"></select>
-          </label>
-          <label>
-            Room or storage spot<input id="itemRoom" name="room" list="roomSuggestions" placeholder="Kitchen, hall closet…" maxlength="100">
-          </label>
-        </div>
-        <datalist id="roomSuggestions">
-        </datalist>
+        <label><span id="itemStatusLabel">Is it in Asheville?</span><select id="itemStatus" name="status"><option value="In stock">Yes, it’s here</option><option value="Out">Need to bring next time</option><option value="Running low">Running low</option><option value="Unknown">Not sure</option></select></label>
         <label class="photo-input-label">
           ▧ <span id="photoInputText">Add a photo (optional)</span><input id="itemPhoto" name="photo" type="file" accept="image/*">
         </label>
@@ -194,15 +177,22 @@
           <img id="photoPreview" alt="Selected photo preview"><button type="button" id="removePhoto" class="close-button" aria-label="Remove photo">×</button>
         </div>
         <details id="itemDetails">
-          <summary>A few more details <span>optional</span></summary>
+          <summary>Where & other details <span>optional</span></summary>
           <div class="stack details-content">
+            <div class="field-row">
+              <label>
+                Saved at<select id="itemHome" name="homeId"></select>
+              </label>
+              <label>
+                Room or storage spot<input id="itemRoom" name="room" list="roomSuggestions" placeholder="Kitchen, hall closet…" maxlength="100">
+              </label>
+            </div>
+            <datalist id="roomSuggestions">
+            </datalist>
             <label>
               Shelf, drawer, or bin<input id="itemLocation" name="location" placeholder="Top shelf, blue bin…" maxlength="200">
             </label>
             <div class="field-row">
-              <label>
-                Status<select id="itemStatus" name="status"><option value="In stock">Have it</option><option value="Running low">Running low</option><option value="Out">Need it</option><option value="Unknown">Not sure</option></select>
-              </label>
               <label>
                 Quantity<input id="itemQuantity" name="quantity" placeholder="A couple, 2 packs…" maxlength="100">
               </label>
@@ -340,7 +330,7 @@
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
     </div>
-    <script type="module" src="app.js?v=20261016-pwa2"></script>
-    <script type="module" src="pwa.js?v=20261016-pwa2"></script>
+    <script type="module" src="app.js?v=20261016-simple6"></script>
+    <script type="module" src="pwa.js?v=20261016-simple6"></script>
   </body>
 </html>

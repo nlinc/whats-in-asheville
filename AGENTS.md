@@ -2,15 +2,15 @@
 
 > **Self-maintenance rule.** If a change alters this repo's shape, stack, verification loop, or guardrails, update this file as part of the same change. This rule does not authorize creating a commit.
 
-Tracks inventory and quick room/closet photos for Nick and Christina’s Asheville
-condo and Morganton home. Asheville is the default: the primary use is checking
-what is already there while packing for the hour drive. Room browsing and search
-come first; item details, restock status, and trip reminders are secondary.
-Single household, two allowed users (Nick + Christina). Local-first: inventory
-works without Firebase via `localStorage` and syncs when signed in. A service
-worker caches the public app shell for cold offline starts after the first online
-visit; sharing and cloud photos need a connection. Keep changes conservative and
-preserve the existing structure.
+Remembers what is in Asheville and what to bring next time for Nick and Christina.
+The main view follows the device’s current location: Morganton → pack for Asheville;
+Asheville → capture next-time reminders and a short departure checkpoint. Location
+selection is a device preference, not an inventory filter or a shared household
+setting. Asheville memory (items and room photos) is secondary; saved Morganton
+inventory and older reminders remain accessible. Single household, two allowed
+users. Local-first via the original localStorage key, with optional Firebase sync.
+The service worker supports cold offline starts after one online visit. Sharing,
+cloud photos, and some browser voice services need a connection.
 
 ## Stack (authoritative)
 
@@ -40,12 +40,23 @@ Firebase's general `**/.*` pattern does not exclude their contents.
 - App entry / UI shell: `index.html`
 - Main client logic (state, rendering, event wiring): `app.js`
 - UI: “What’s where,” warm paper colors, room cards, native HTML dialogs, and
-  swipe right Have it / swipe left Need it with undo. Room photos stand alone;
+  swipe right Have it / swipe left Bring next time with undo. Room photos stand alone;
   users do not have to itemize a closet.
 - State: `homes`, `items`, `places` (room photos/notes), `tasks`, `updatedAt`.
   Keep the original `asheville-condo-tracker-v1` localStorage key. Old items and
   tasks without `homeId` migrate to `asheville`; old backups remain importable.
   Both homes still share the original single Firestore household document.
+  Items additionally retain `packedForTrip` and `checkedAt`; room photos retain
+  `photoUpdatedAt` and `checkedAt`. Old data defaults these safely. A packing check
+  never changes inventory status. Only an explicit inventory update / Here now
+  changes what is present. Completed reminders persist and can be unchecked;
+  switching locations never clears or resets them. Other-home reminders remain
+  in a collapsed section, and other-home inventory in the memory filter.
+- Voice capture: optional native SpeechRecognition/webkitSpeechRecognition in
+  app.js, started only by a tap. It fills an editable reminder; Add is explicit.
+  Cancel capture on navigation/backgrounding and preserve typing on errors.
+  Unsupported browsers keep typing/keyboard dictation. No audio storage, AI
+  parsing, paid transcription service, dependency, or server endpoint.
 - Styles: `styles.css`
 - Installable app: `manifest.webmanifest`, `sw.js`, `pwa.js`, and `icons/` (the SVG
   mark, 192px/512px PNG icons, and 180px Apple touch icon). No native wrapper or
@@ -85,12 +96,23 @@ a `package.json` just to have "a loop." Verify manually instead:
    - **Room photos**: Quick photo creates a standalone room/closet card without
      item records. Test update/removal, full-size viewing, notes search, and
      renaming a photographed room (its items move along with it).
-   - **Homes**: Asheville opens by default. Check Morganton stays separate,
-     Both homes search identifies the home, and place names save in Settings.
-   - **Bring & buy tab**: low/out/unknown inventory appears automatically. Add a
-     reminder, toggle done, delete it, and Copy list (includes inventory needs).
-   - **Search/filter**: search is at the top; typing searches all rooms in the
-     selected home. Check status/room selects, no-results feedback, and Clear.
+   - **Current location**: Morganton opens the packing list; Asheville opens
+     next-time capture. The same Asheville reminders/needs appear in both.
+     Location is remembered on this device only. Other saved home inventory is
+     reachable under Other homes & filters; older reminders remain accessible.
+   - **Packing/capture**: add with text only, check/uncheck, remove/Undo, copy.
+     Check a low/out inventory need and confirm its status is unchanged. Here now
+     explicitly updates it after arrival. Completed reminders must survive reload
+     and location switches; a repeated completed reminder reopens without duplicates.
+   - **Upkeep**: exercise all Leaving Asheville checkpoint paths. Took home adds
+     an inventory need; Here now removes it. Refresh only a changed photo or use
+     Still looks right for that specific room. Other edits and All set must not
+     stamp every photo as checked. Show saved dates honestly for older records.
+   - **Voice**: verify final transcript is editable before Add, errors/denial,
+     unsupported fallback, and abort on navigation/background or typing. Use
+     isolated speech mocks; actual microphone/transcription needs a phone check.
+   - **Search/filter**: secondary memory search finds items and room photo notes;
+     check hidden room/home/status filters, no-results feedback, and Clear.
    - **Import/Export** (Settings): export/import round-trips both homes, room
      photos, and tasks; also import an old items/tasks-only backup. Check import
      cancel and confirm. Invalid backup entries must not replace existing data.
@@ -100,7 +122,7 @@ a `package.json` just to have "a loop." Verify manually instead:
      the device has signed-out changes, verify the explicit local-versus-shared
      choice before either list is replaced.
    - **Mobile viewport**: check 390px and 320px widths plus desktop. Search must
-     appear in the first screen; dialogs must fit and swipe must not block vertical
+     be easy to reach in the memory view; dialogs must fit and swipe must not block vertical
      scrolling. This app is used from a phone while packing.
    - **Asset freshness**: index.html versions its CSS/app URLs and app.js versions
      its firebase-client import with matching release query strings. Bump them
@@ -175,6 +197,10 @@ your report which of the flows above you actually exercised.
   also upload before sharing on sign-in. Keep both paths working. Replacing,
   removing, or deleting a signed-in cloud photo removes the superseded Storage
   object only after the new shared state saves successfully.
+- **Preserve memory.** Do not clear or recreate saved household state during UI
+  changes. Current-location preferences are separate from inventory home IDs.
+  Never claim an inventory item arrived just because it was checked while packing,
+  or a photo was checked because an unrelated reminder or setting changed.
 - **Destructive ops**: item deletion and backup import require explicit labeled
   confirmation in the app’s confirmation dialog; retain safe cancel behavior.
   Task deletion is intentionally immediate because tasks are low-stakes. Don't
