@@ -15,7 +15,7 @@ const service = {
   ready: false,
   async init({ onStatus, onState }) {
     if (!hasConfig) {
-      onStatus({ mode: "local", message: "Local only. Add Firebase config to enable shared sync." });
+      onStatus({ mode: "local", message: "Saved on this device. Shared lists are not configured." });
       return;
     }
 
@@ -35,7 +35,7 @@ const service = {
 
       authModule.onAuthStateChanged(auth, (user) => {
         service.user = user;
-        service.ready = Boolean(user);
+        service.ready = false;
 
         if (unsubscribeState) {
           unsubscribeState();
@@ -47,14 +47,18 @@ const service = {
           return;
         }
 
-        onStatus({ mode: "cloud", message: `Syncing as ${user.displayName || user.email}` });
+        onStatus({ mode: "loading", message: `Opening the shared list for ${user.displayName || user.email}…` });
         unsubscribeState = firestoreModule.onSnapshot(docRef, (snapshot) => {
+          service.ready = true;
+          onStatus({ mode: "cloud", message: `Shared as ${user.displayName || user.email}.` });
           if (!snapshot.exists()) {
             onState(null);
             return;
           }
           const data = snapshot.data();
           onState({
+            homes: data.homes,
+            places: data.places,
             items: Array.isArray(data.items) ? data.items : [],
             tasks: Array.isArray(data.tasks) ? data.tasks : [],
             updatedAt: data.updatedAt || new Date().toISOString()
@@ -70,18 +74,18 @@ const service = {
     }
   },
   async signIn() {
-    if (!auth) return;
+    if (!auth) throw new Error("Sharing is still connecting. Try again in a moment.");
     const authModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-auth.js`);
     const provider = new authModule.GoogleAuthProvider();
     await authModule.signInWithPopup(auth, provider);
   },
   async signOut() {
-    if (!auth) return;
+    if (!auth) throw new Error("Sharing is still connecting. Try again in a moment.");
     const authModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-auth.js`);
     await authModule.signOut(auth);
   },
   async saveState(state) {
-    if (!docRef || !service.user) return;
+    if (!docRef || !service.user || !service.ready) throw new Error("The shared list is still loading. Your changes are saved on this device.");
     const firestoreModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-firestore.js`);
     await firestoreModule.setDoc(docRef, {
       ...state,

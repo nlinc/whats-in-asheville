@@ -1,264 +1,326 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Asheville Condo Tracker</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <meta name="theme-color" content="#f6f3eb"> <title>What's where · Home inventory</title> <link rel="stylesheet" href="styles.css?v=20261016-6">
   </head>
   <body>
-    <header class="navbar">
-      <div class="logo">
-        <span class="logo-mark" aria-hidden="true">A</span>
-        <div>
-          <span>Asheville Condo</span>
-          <small>Inventory tracker</small>
-        </div>
-      </div>
-      <div class="header-actions">
-        <button class="secondary-button" id="signInButton" type="button">
-          Sign In
-        </button>
-        <button class="secondary-button hidden" id="signOutButton" type="button">
-          Sign Out
-        </button>
-        <button class="secondary-button" id="exportData" type="button">
-          Export Backup
-        </button>
-        <label class="secondary-button import-button">
-          Import Backup
-          <input id="importData" type="file" accept="application/json">
-        </label>
-      </div>
-    </header>
-
-    <main class="app-shell">
-      <section class="dash-header">
-        <div>
-          <p class="eyebrow">Second home memory</p>
-          <h1>Know what is there before you pack.</h1>
-          <p class="subtitle">Track closets, cabinets, supplies, restock needs, and pre-trip reminders in one place.</p>
-        </div>
-      </section>
-
-      <section class="sync-card" aria-live="polite">
-        <div>
-          <span id="syncDot" class="sync-dot local"></span>
-          <strong id="syncMode">Local Mode</strong>
-        </div>
-        <p id="syncMessage">Local only. Add Firebase config to enable shared sync.</p>
-      </section>
-
-      <section class="summary-grid" aria-label="Inventory summary">
-        <article class="summary-card">
-          <span class="summary-label">Items tracked</span>
-          <strong id="totalItems">0</strong>
-        </article>
-        <article class="summary-card urgent">
-          <span class="summary-label">Need attention</span>
-          <strong id="attentionItems">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Trip tasks</span>
-          <strong id="tripTaskCount">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Last updated</span>
-          <strong id="lastUpdated">Today</strong>
-        </article>
-      </section>
-
-      <section class="priority-card">
-        <div class="section-heading compact">
-          <div>
-            <h2>Next Trip Snapshot</h2>
-            <p>Low, out, or unknown items bubble up here automatically.</p>
-          </div>
-          <button class="primary-button" type="button" data-jump-view="trip">Open Trip Prep</button>
-        </div>
-        <div id="attentionList" class="attention-list"></div>
-      </section>
-
-      <section class="workspace">
-        <aside class="sidebar" aria-label="Controls">
-          <div class="panel">
-            <div class="panel-heading">
-              <h2 id="formHeading">Add Item</h2>
-            </div>
-            <form id="itemForm" class="stack">
-              <label>
-                Item
-                <input id="itemName" name="name" type="text" placeholder="Coffee filters" required>
-              </label>
-              <div class="field-row">
-                <label>
-                  Room
-                  <select id="itemRoom" name="room"></select>
-                </label>
-                <label>
-                  Category
-                  <select id="itemCategory" name="category"></select>
-                </label>
-              </div>
-              <div class="field-row">
-                <label>
-                  Status
-                  <select id="itemStatus" name="status">
-                    <option value="In stock">In stock</option>
-                    <option value="Running low">Running low</option>
-                    <option value="Out">Out</option>
-                    <option value="Unknown">Unknown</option>
-                  </select>
-                </label>
-                <label>
-                  Quantity
-                  <input id="itemQuantity" name="quantity" type="text" placeholder="2 packs">
-                </label>
-              </div>
-              <label>
-                Location
-                <input id="itemLocation" name="location" type="text" placeholder="Pantry, top shelf">
-              </label>
-              <label>
-                Notes
-                <textarea id="itemNotes" name="notes" rows="3" placeholder="Preferred brand, size, or reminder"></textarea>
-              </label>
-              <label>
-                Photo
-                <input id="itemPhoto" name="photo" type="file" accept="image/*">
-              </label>
-              <div id="photoPreviewContainer" class="photo-preview-container hidden">
-                <img id="photoPreview" src="" alt="Selected photo preview">
-                <button type="button" id="removePhoto" class="remove-photo-btn" title="Remove photo" aria-label="Remove photo">&times;</button>
-              </div>
-              <div class="form-actions-row">
-                <button class="primary-button" id="itemFormSubmit" type="submit">Add item</button>
-                <button class="secondary-button hidden" id="cancelEdit" type="button">Cancel</button>
-              </div>
-            </form>
-          </div>
-
-          <div class="panel">
-            <div class="panel-heading">
-              <h2>Filters</h2>
-              <button class="text-button" id="clearFilters" type="button">Clear</button>
-            </div>
-            <label>
-              Search
-              <input id="searchInput" type="search" placeholder="Search items, notes, rooms">
-            </label>
-            <div class="filter-group" aria-label="Status filter">
-              <button class="filter-chip active" type="button" data-status="All">All</button>
-              <button class="filter-chip" type="button" data-status="Running low">Low</button>
-              <button class="filter-chip" type="button" data-status="Out">Out</button>
-              <button class="filter-chip" type="button" data-status="Unknown">Unknown</button>
-            </div>
-            <label>
-              Room
-              <select id="roomFilter"></select>
-            </label>
-          </div>
-        </aside>
-
-        <section class="content-area">
-          <nav class="tabs" aria-label="Views">
-            <button class="tab active" type="button" data-view="inventory">Inventory</button>
-            <button class="tab" type="button" data-view="trip">Next Trip</button>
-            <button class="tab" type="button" data-view="photos">Photo Memory</button>
+    <a class="skip-link" href="#main">Skip to inventory</a>
+    <div class="app-layout">
+      <aside class="rail">
+        <a class="wordmark" href="./" aria-label="What's where home"><span class="brand-mark" aria-hidden="true">w<span>↗</span></span><span>what’s<br>where<span class="brand-period">.</span></span></a>
+        <div class="places-nav">
+          <p class="eyebrow">
+            Your places
+          </p>
+          <nav id="homeNav" aria-label="Choose a home">
           </nav>
-
-          <section id="inventoryView" class="view active" aria-label="Inventory">
+        </div>
+        <div class="rail-note">
+          <span aria-hidden="true">↔</span>
+          <p>
+            Two homes.<br>A little less to remember.
+          </p>
+        </div>
+        <div class="rail-footer">
+          <button id="openSettings" class="quiet-button" type="button"><span aria-hidden="true">⚙</span> Settings & sharing</button>
+          <div class="sync-indicator">
+            <span id="syncDot" class="sync-dot local"></span><span id="syncMode">On this device</span>
+          </div>
+        </div>
+      </aside>
+      <main id="main" class="main">
+        <header class="page-top">
+          <span class="eyebrow" id="homeEyebrow">The Asheville place</span><button class="primary-button add-button" id="jumpToAddItem" type="button"><span aria-hidden="true">+</span> Add item</button>
+        </header>
+        <section class="hero">
+          <p class="hero-kicker">
+            A little space in your head.
+          </p>
+          <h1>
+            It’s already <em>there.</em>
+          </h1>
+          <p id="heroDescription">
+            Know what’s in Asheville. Leave the extra packing behind.
+          </p>
+          <div class="hero-sketch" aria-hidden="true">
+            <svg viewBox="0 0 190 140" fill="none"><path d="M15 120h160M44 119V46l51-31 51 31v73M32 53l63-38 63 38M78 119V79h34v40M52 61h14v18H52zM124 61h14v18h-14z"/><path d="M19 103c-15-25 17-37 17-17 0 8-6 13-6 13M30 118V91M163 118V83m-8 16c-17-16 1-31 8-16 10-24 28-5 9 10"/><path class="sketch-sun" d="M164 24v-8m0 33v-8m-9-9h-8m34 0h-8m-16-7-6-6m25 25-6-6m-14 0-6 6m25-25-6 6"/></svg><span>less stuff. more weekend.</span>
+          </div>
+        </section>
+        <div class="search-bar">
+          <span aria-hidden="true">⌕</span><input id="searchInput" type="search" aria-label="Find an item or place" placeholder="Do we have a…" autocomplete="off"><span class="search-hint">Let’s find it.</span>
+        </div>
+        <nav class="view-tabs" aria-label="Views">
+          <button class="tab active" data-view="inventory" type="button" aria-pressed="true">What’s here</button><button class="tab" data-view="trip" type="button" aria-pressed="false">Bring & buy <span id="tripTaskCount" class="tab-count">0</span></button>
+        </nav>
+        <section id="inventoryView" class="view active" aria-label="Inventory">
+          <section id="roomsSection">
             <div class="section-heading">
               <div>
-                <h2>What's There</h2>
-                <p>Room-by-room items with quantities, shelf locations, and restock status.</p>
+                <p class="eyebrow">
+                  A place for everything
+                </p>
+                <h2>
+                  Take a look around.
+                </h2>
               </div>
-              <div class="section-actions">
-                <button class="primary-button" id="jumpToAddItem" type="button">Add item</button>
-                <button class="secondary-button" id="seedExamples" type="button">Add starter set</button>
-              </div>
+              <button class="text-button" id="quickPhoto" type="button"><span aria-hidden="true">▧</span> Quick photo</button>
             </div>
-            <div id="inventoryList" class="item-list"></div>
+            <div id="roomGrid" class="room-grid">
+            </div>
+            <p class="room-help">
+              A closet photo counts. You don’t have to list every little thing.
+            </p>
+          </section>
+          <div id="roomDetail" class="hidden">
+            <button id="backToRooms" class="text-button back-button" type="button">← All rooms</button>
+            <div id="roomOverview">
+            </div>
+          </div>
+          <section class="inventory-section">
+            <div class="section-heading inventory-heading">
+              <div>
+                <p class="eyebrow" id="listEyebrow">
+                  The little things, remembered
+                </p>
+                <h2 id="listHeading">
+                  Everything here
+                </h2>
+              </div>
+              <span id="resultCount" class="count-label"></span>
+            </div>
+            <div class="filters">
+              <label class="sr-only" for="roomFilter">
+                Room filter
+              </label>
+              <select id="roomFilter"></select>
+              <label class="sr-only" for="statusFilter">
+                Status filter
+              </label>
+              <select id="statusFilter"><option value="All">Any status</option><option value="In stock">Have it</option><option value="Running low">Running low</option><option value="Out">Need it</option><option value="Unknown">Not sure</option></select><button id="clearFilters" class="text-button hidden" type="button">Clear</button>
+            </div>
+            <p class="swipe-hint" id="swipeHint">
+              Swipe an item: <span>← need it</span><span>have it →</span>
+            </p>
+            <div id="inventoryList" class="item-list">
+            </div>
             <div id="emptyInventory" class="empty-state">
-              <h3>No items yet</h3>
-              <p>Add a few essentials or use the starter set to get the condo map going.</p>
-            </div>
-          </section>
-
-          <section id="tripView" class="view" aria-label="Trip prep">
-            <div class="section-heading">
-              <div>
-                <h2>Trip Prep</h2>
-                <p>Use this before leaving home or when making the first grocery run in Asheville.</p>
-              </div>
-              <button class="secondary-button" id="copyChecklist" type="button">Copy Checklist</button>
-            </div>
-            <form id="taskForm" class="task-form">
-              <input id="taskText" type="text" placeholder="Bring spare phone charger">
-              <select id="taskType" aria-label="Task type">
-                <option value="Bring">Bring</option>
-                <option value="Buy">Buy</option>
-                <option value="Check">Check</option>
-              </select>
-              <button class="primary-button" type="submit">Add</button>
-            </form>
-            <div id="taskColumns" class="task-columns"></div>
-          </section>
-
-          <section id="photosView" class="view" aria-label="Photos">
-            <div class="section-heading">
-              <div>
-                <h2>Photo Memory</h2>
-                <p>Cabinets, closets, drawers, and storage bins are easier to remember when you can see them.</p>
-              </div>
-            </div>
-            <div id="photoGrid" class="photo-grid"></div>
-            <div id="emptyPhotos" class="empty-state">
-              <h3>No photos yet</h3>
-              <p>Add photos to inventory items and they will show up here.</p>
+              <span class="empty-symbol" aria-hidden="true">↗</span>
+              <h3>
+                A little less to remember.
+              </h3>
+              <p>
+                Add something you always wonder about when packing.<br>Or just take a photo of a closet.
+              </p>
+              <button class="primary-button" data-add-item type="button">+ Your first item</button>
             </div>
           </section>
         </section>
-      </section>
-    </main>
-
-    <template id="itemTemplate">
-      <article class="item-card">
-        <div class="item-main">
-          <img class="item-photo" alt="">
-          <div>
-            <div class="item-title-row">
-              <h3></h3>
-              <span class="status-pill"></span>
+        <section id="tripView" class="view" aria-label="Bring and buy">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">
+                For the hour up the road
+              </p>
+              <h2>
+                A little list for the trip.
+              </h2>
             </div>
-            <p class="item-meta"></p>
-            <p class="item-notes"></p>
+            <button id="copyChecklist" class="secondary-button" type="button">Copy list</button>
           </div>
-        </div>
-        <div class="item-actions">
-          <button class="icon-button edit-item" type="button" title="Edit item" aria-label="Edit item">✎</button>
-          <button class="icon-button prep-item" type="button" title="Add to Trip Prep" aria-label="Add to Trip Prep">📋</button>
-          <button class="icon-button mark-low" type="button" title="Mark running low" aria-label="Mark running low">!</button>
-          <button class="icon-button mark-out" type="button" title="Mark out" aria-label="Mark out">0</button>
-          <button class="icon-button mark-stock" type="button" title="Mark in stock" aria-label="Mark in stock">OK</button>
-          <button class="icon-button delete-item" type="button" title="Delete item" aria-label="Delete item">X</button>
-        </div>
-      </article>
-    </template>
-
-    <!-- Lightbox Modal -->
-    <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Photo view">
-      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close photo">&times;</button>
-      <div class="lightbox-content">
-        <img id="lightboxImg" src="" alt="">
-        <div class="lightbox-info">
-          <h3 id="lightboxTitle"></h3>
-          <p id="lightboxMeta"></p>
-          <p id="lightboxNotes"></p>
-        </div>
-      </div>
+          <p class="section-intro">
+            Low or missing things show up here. Add anything else you want to remember.
+          </p>
+          <div id="attentionList" class="attention-list">
+          </div>
+          <form id="taskForm" class="task-form">
+            <label class="sr-only" for="taskText">
+              Something to remember
+            </label>
+            <input id="taskText" type="text" placeholder="Something to remember…" required>
+            <label class="sr-only" for="taskType">
+              Task type
+            </label>
+            <select id="taskType"><option value="Bring">Bring</option><option value="Buy">Buy</option><option value="Check">Check</option></select><select id="taskHome" class="hidden" aria-label="Home for reminder"></select><button class="primary-button" type="submit">Add</button>
+          </form>
+          <div id="taskColumns" class="task-columns">
+          </div>
+        </section>
+        <footer class="page-footer">
+          <span>A home for the things you forget.</span><span id="lastUpdated"></span>
+        </footer>
+      </main>
     </div>
-
-    <script type="module" src="app.js"></script>
+    <dialog id="itemDialog" class="sheet" aria-labelledby="formHeading">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">
+            Make a little room in your head
+          </p>
+          <h2 id="formHeading">
+            Remember this.
+          </h2>
+        </div>
+        <button class="close-button" data-close="itemDialog" aria-label="Close item form" type="button">×</button>
+      </div>
+      <form id="itemForm" class="stack">
+        <label>
+          Item<input id="itemName" name="name" autofocus placeholder="Phone charger, hiking boots…" required maxlength="200" autocomplete="off">
+        </label>
+        <div class="field-row">
+          <label>
+            Home<select id="itemHome" name="homeId"></select>
+          </label>
+          <label>
+            Room or storage spot<input id="itemRoom" name="room" list="roomSuggestions" placeholder="Kitchen, hall closet…" maxlength="100">
+          </label>
+        </div>
+        <datalist id="roomSuggestions">
+        </datalist>
+        <label class="photo-input-label">
+          ▧ <span id="photoInputText">Add a photo (optional)</span><input id="itemPhoto" name="photo" type="file" accept="image/*">
+        </label>
+        <div id="photoPreviewContainer" class="photo-preview-container hidden">
+          <img id="photoPreview" alt="Selected photo preview"><button type="button" id="removePhoto" class="close-button" aria-label="Remove photo">×</button>
+        </div>
+        <details id="itemDetails">
+          <summary>A few more details <span>optional</span></summary>
+          <div class="stack details-content">
+            <label>
+              Shelf, drawer, or bin<input id="itemLocation" name="location" placeholder="Top shelf, blue bin…" maxlength="200">
+            </label>
+            <div class="field-row">
+              <label>
+                Status<select id="itemStatus" name="status"><option value="In stock">Have it</option><option value="Running low">Running low</option><option value="Out">Need it</option><option value="Unknown">Not sure</option></select>
+              </label>
+              <label>
+                Quantity<input id="itemQuantity" name="quantity" placeholder="A couple, 2 packs…" maxlength="100">
+              </label>
+            </div>
+            <label>
+              Notes<textarea id="itemNotes" name="notes" rows="2" placeholder="Anything worth remembering" maxlength="2000"></textarea>
+            </label>
+            <label>
+              Category<select id="itemCategory" name="category"></select>
+            </label>
+          </div>
+        </details>
+        <p id="itemFormError" class="form-error" role="alert">
+        </p>
+        <div class="dialog-actions">
+          <button class="primary-button" id="itemFormSubmit" type="submit">Save item</button><button id="deleteEditingItem" class="danger-button hidden" type="button">Delete item</button>
+        </div>
+        <button id="photoInstead" class="text-button" type="button">A whole closet? Just take a photo →</button>
+      </form>
+    </dialog>
+    <dialog id="placeDialog" class="sheet" aria-labelledby="placeHeading">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">
+            No need to itemize
+          </p>
+          <h2 id="placeHeading">
+            Snap it. Remember it.
+          </h2>
+        </div>
+        <button class="close-button" data-close="placeDialog" aria-label="Close quick photo" type="button">×</button>
+      </div>
+      <form id="placeForm" class="stack">
+        <p class="muted">
+          Open the closet. Take a photo. Next time, just look here.
+        </p>
+        <div class="field-row">
+          <label>
+            Home<select id="placeHome" name="homeId"></select>
+          </label>
+          <label>
+            Room or storage spot<input id="placeName" name="name" list="roomSuggestions" placeholder="Hall closet" required maxlength="100">
+          </label>
+        </div>
+        <label class="photo-input-label">
+          ▧ <span id="placePhotoLabel">Choose or take a photo</span><input id="placePhoto" name="photo" type="file" accept="image/*">
+        </label>
+        <div id="placePreviewContainer" class="photo-preview-container hidden">
+          <img id="placePreview" alt="Room photo preview"><button id="removePlacePhoto" class="close-button" type="button" aria-label="Remove room photo">×</button>
+        </div>
+        <label>
+          What’s in here? <span class="optional">optional</span><textarea id="placeNotes" name="notes" rows="2" placeholder="Coats, hiking shoes, spare blankets…" maxlength="2000"></textarea>
+        </label>
+        <p id="placeFormError" class="form-error" role="alert">
+        </p>
+        <button id="savePlace" class="primary-button" type="submit">Save photo</button>
+      </form>
+    </dialog>
+    <dialog id="settingsDialog" class="sheet" aria-labelledby="settingsHeading">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">
+            The practical bits
+          </p>
+          <h2 id="settingsHeading">
+            Make yourself at home.
+          </h2>
+        </div>
+        <button class="close-button" data-close="settingsDialog" aria-label="Close settings" type="button">×</button>
+      </div>
+      <section class="settings-section">
+        <h3>
+          Shared with your person
+        </h3>
+        <p id="syncMessage" class="muted">
+          Saved on this device. Sign in to share with each other.
+        </p>
+        <div class="button-row">
+          <button id="signInButton" class="primary-button" type="button">Sign in with Google</button><button id="signOutButton" class="secondary-button hidden" type="button">Sign out</button>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3>
+          Your places
+        </h3>
+        <form id="homesForm" class="stack">
+          <div id="homeFields" class="stack">
+          </div>
+          <button class="secondary-button" type="submit">Save names</button>
+        </form>
+      </section>
+      <section class="settings-section">
+        <h3>
+          Keep a copy
+        </h3>
+        <p class="muted">
+          Back up both homes, photos, and your trip list.
+        </p>
+        <div class="button-row">
+          <button id="exportData" class="secondary-button" type="button">Export backup</button>
+          <label class="secondary-button import-button">
+            Import backup<input id="importData" type="file" accept="application/json">
+          </label>
+        </div>
+      </section>
+    </dialog>
+    <dialog id="lightbox" class="lightbox" aria-label="Photo view">
+      <button class="close-button" id="lightboxClose" type="button" aria-label="Close photo">×</button><img id="lightboxImg" alt="">
+      <div class="lightbox-info">
+        <h2 id="lightboxTitle">
+        </h2>
+        <p id="lightboxMeta">
+        </p>
+        <p id="lightboxNotes">
+        </p>
+      </div>
+    </dialog>
+    <dialog id="confirmationDialog" class="sheet confirmation-sheet" aria-labelledby="confirmationTitle">
+      <h2 id="confirmationTitle">
+      </h2>
+      <p id="confirmationMessage" class="muted">
+      </p>
+      <div class="dialog-actions">
+        <button id="confirmationCancel" class="secondary-button" type="button" autofocus>Keep it</button><button id="confirmationAccept" class="primary-button" type="button">Continue</button>
+      </div>
+    </dialog>
+    <div id="toast" class="toast hidden" role="status">
+      <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
+    </div>
+    <script type="module" src="app.js?v=20261016-6"></script>
   </body>
 </html>

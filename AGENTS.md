@@ -1,11 +1,14 @@
 # AGENTS.md — Asheville Condo Tracker (whats-in-asheville)
 
-> ⚙️ **Self-maintenance rule — do this automatically, every time.** If a change you make alters this repo's **shape** (files, entry points, structure), its **stack/dependencies**, the **build/test loop**, or a **guardrail**, you MUST update the matching section of THIS file in the *same commit* — before the task counts as done. This is not optional cleanup or a follow-up task.
+> **Self-maintenance rule.** If a change alters this repo's shape, stack, verification loop, or guardrails, update this file as part of the same change. This rule does not authorize creating a commit.
 
-Tracks inventory (closets, cabinets, pantry, supplies), restock status, trip-prep
-tasks, and item photos for Nick's Asheville condo. Single household, two allowed
-users (Nick + Christina). Local-first: works fully offline via `localStorage`,
-and syncs to Firebase when signed in. Keep changes conservative and preserve the
+Tracks inventory and quick room/closet photos for Nick and Christina’s Asheville
+condo and Morganton home. Asheville is the default: the primary use is checking
+what is already there while packing for the hour drive. Room browsing and search
+come first; item details, restock status, and trip reminders are secondary.
+Single household, two allowed users (Nick + Christina). Local-first: inventory
+works without Firebase via `localStorage` and syncs when signed in. A loaded app
+works offline; a fresh offline load depends on browser caching (no service worker). Keep changes conservative and preserve the
 existing structure.
 
 ## Stack (authoritative)
@@ -34,6 +37,13 @@ Firebase's general `**/.*` pattern does not exclude their contents.
 
 - App entry / UI shell: `index.html`
 - Main client logic (state, rendering, event wiring): `app.js`
+- UI: “What’s where,” warm paper colors, room cards, native HTML dialogs, and
+  swipe right Have it / swipe left Need it with undo. Room photos stand alone;
+  users do not have to itemize a closet.
+- State: `homes`, `items`, `places` (room photos/notes), `tasks`, `updatedAt`.
+  Keep the original `asheville-condo-tracker-v1` localStorage key. Old items and
+  tasks without `homeId` migrate to `asheville`; old backups remain importable.
+  Both homes still share the original single Firestore household document.
 - Styles: `styles.css`
 - Firebase browser config (public config + `householdId`): `firebase-config.js`
 - Firebase service wrapper (auth, Firestore sync, Storage photo upload): `firebase-client.js`
@@ -57,19 +67,33 @@ a `package.json` just to have "a loop." Verify manually instead:
 1. Serve the repo root over HTTP (`python3 -m http.server` works fine), then open
    it in a browser. Do not rely on opening `index.html` as a `file://` URL because
    the app uses ES modules. Exercise the flow you touched:
-   - **Local mode** (no sign-in): add an item, edit it, mark it Running low/Out/In
-     stock, delete it, attach a photo, confirm it lands in Photo Memory and the
-     Next Trip Snapshot.
-   - **Trip Prep tab**: add a task, toggle done, delete it, Copy Checklist.
-   - **Search/filter**: search box, status chips, room filter, Clear.
-   - **Import/Export**: Export Backup downloads JSON; Import Backup round-trips it.
+   - **Local mode** (no sign-in): add/edit an item through the Add item dialog;
+     use its status select for Have it/Running low/Need it/Not sure. Swipe right
+     and left, then Undo. Delete through the edit dialog and check both cancel
+     and confirm. Attach/replace/remove an item photo and open it full size.
+   - **Room photos**: Quick photo creates a standalone room/closet card without
+     item records. Test update/removal, full-size viewing, notes search, and
+     renaming a photographed room (its items move along with it).
+   - **Homes**: Asheville opens by default. Check Morganton stays separate,
+     Both homes search identifies the home, and place names save in Settings.
+   - **Bring & buy tab**: low/out/unknown inventory appears automatically. Add a
+     reminder, toggle done, delete it, and Copy list (includes inventory needs).
+   - **Search/filter**: search is at the top; typing searches all rooms in the
+     selected home. Check status/room selects, no-results feedback, and Clear.
+   - **Import/Export** (Settings): export/import round-trips both homes, room
+     photos, and tasks; also import an old items/tasks-only backup. Check import
+     cancel and confirm. Invalid backup entries must not replace existing data.
    - **Sign-in flow** (if `firebase-config.js` has real values and you can reach
-     Firebase): Sign In, confirm the sync pill updates (Local → Signed out →
-     Syncing as ...), add an item, confirm it round-trips through Firestore. If
+     Firebase): Sign In, confirm sharing updates from On this device →
+     Connecting → Shared & saved, add an item, confirm it round-trips through Firestore. If
      the device has signed-out changes, verify the explicit local-versus-shared
      choice before either list is replaced.
-   - **Mobile viewport**: resize / use device toolbar — this app is used from a
-     phone while packing.
+   - **Mobile viewport**: check 390px and 320px widths plus desktop. Search must
+     appear in the first screen; dialogs must fit and swipe must not block vertical
+     scrolling. This app is used from a phone while packing.
+   - **Asset freshness**: index.html versions its CSS/app URLs and app.js versions
+     its firebase-client import with matching release query strings. Bump them
+     together when changing browser assets so cached versions cannot mix.
 2. Check the browser console for errors on load and after each action above.
 3. If you touched `firestore.rules` or `storage.rules`, re-read them line by
    line — there is no rules emulator/test harness wired up here, so a mistake
@@ -87,18 +111,16 @@ your report which of the flows above you actually exercised.
 
 - **Human owns the push by default.** The `origin` remote is
   `https://github.com/nlinc/whats-in-asheville.git`. A push to `main` is expected
-  to auto-deploy Firebase Hosting like Nick's other Micro-Apps. Agents commit
-  locally, report the SHA, and stop unless the user explicitly requests a push
-  or Firebase deploy.
+  to auto-deploy Firebase Hosting like Nick's other Micro-Apps. Do not commit,
+  push, or deploy unless the user explicitly requests that exact action.
 - **Surgical changes only.** No unrelated refactors, reformatting, or drive-by
   "cleanup."
 - **Mobile first.** Verify the mobile layout after any UI change — this is a
   packing-list app used from a phone.
-- **No plain `innerHTML` for user-entered data.** Prefer `textContent` or
-  building DOM nodes, as most of `app.js` already does. `renderAttention` still
-  uses an HTML string and runs every interpolated item field through the existing
-  `escapeHtml()` helper. If you touch it or add a similar renderer, escape every
-  field or build DOM nodes instead. This includes URLs imported from backups.
+- **No plain `innerHTML` for user-entered data.** Use `textContent` or DOM nodes.
+  The only HTML-string renderer is `roomArt`, using fixed SVG path constants.
+  Never interpolate household data into it. Imported photo URLs are restricted
+  to HTTPS URLs or supported raster data URLs.
 - **Two-user access model.** `firestore.rules` and `storage.rules` are both
   hardcoded to two literal emails. Don't genericize this into an open or
   role-based model without being asked — the whole point is it's a private
@@ -111,19 +133,20 @@ your report which of the flows above you actually exercised.
   fields empty/missing (pure `localStorage` mode — see `hasConfig` in
   `firebase-client.js`). Don't make Firebase a hard dependency for basic
   add/edit/delete.
-- **Simple shared-state model.** Firestore stores the complete item/task state in
+- **Simple shared-state model.** Firestore stores the complete home/item/room-photo/task state in
   one household document, so signed-in changes are last-write-wins. Changes made
   while signed out are marked locally; on the next sign-in, the user must choose
   whether to upload that device's list or discard it in favor of the shared list.
   Do not silently overwrite either side or add complex merge machinery without
   an explicit product decision.
-- **Photos**: item photos are client-compressed to a data URL (`compressImage`)
-  before either being stored inline (local mode) or uploaded to Storage under
-  `households/{householdId}/items/{itemId}/...` (signed-in mode). Keep both
-  paths working if you touch photo handling. When signed in, replacing, removing,
-  or deleting an item's cloud photo must also remove the superseded Storage
-  object after the new state saves successfully.
-- **Destructive ops**: item deletion and backup import require confirmation.
+- **Photos**: item and standalone room photos are client-compressed by
+  `compressImage`, stored inline locally, or uploaded to Storage under
+  `households/{householdId}/items/{recordId}/...` when signed in. Local photos
+  also upload before sharing on sign-in. Keep both paths working. Replacing,
+  removing, or deleting a signed-in cloud photo removes the superseded Storage
+  object only after the new shared state saves successfully.
+- **Destructive ops**: item deletion and backup import require explicit labeled
+  confirmation in the app’s confirmation dialog; retain safe cancel behavior.
   Task deletion is intentionally immediate because tasks are low-stakes. Don't
   remove the item/import confirmations without an explicit request.
 
