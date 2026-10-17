@@ -12,7 +12,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20261016-simple6">
+    <link rel="stylesheet" href="styles.css?v=20261017-home4">
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to today</a>
@@ -33,7 +33,10 @@
           </p>
         </div>
         <div class="rail-footer">
-          <button id="openSettings" class="quiet-button" type="button"><span aria-hidden="true">⚙</span> Settings & sharing</button>
+          <div class="rail-actions">
+            <button id="openSettings" class="quiet-button" type="button"><span aria-hidden="true">⚙</span> Settings & sharing</button>
+            <button id="refreshApp" class="quiet-button" type="button" aria-label="Refresh / update app" title="Refresh / update app"><span aria-hidden="true">↻</span><span class="refresh-label"> Refresh app</span></button>
+          </div>
           <div class="sync-indicator">
             <span id="syncDot" class="sync-dot local"></span><span id="syncMode">On this device</span>
           </div>
@@ -50,6 +53,7 @@
         </section>
         <nav class="view-tabs" aria-label="What do you need?">
           <button class="tab active" data-view="trip" type="button" aria-pressed="true" id="todayTab">Packing list <span id="tripTaskCount" class="tab-count">0</span></button>
+          <button class="tab" data-view="return" type="button" aria-pressed="false" id="returnTab">Take home <span id="returnTaskCount" class="tab-count">0</span></button>
           <button class="tab" data-view="inventory" type="button" aria-pressed="false" id="memoryTab">Already in Asheville</button>
         </nav>
         <section id="inventoryView" class="view" aria-label="Inventory">
@@ -149,6 +153,7 @@
       <div class="dialog-heading"><div><p class="eyebrow">Before you head home</p><h2 id="departureHeading">Anything changed?</h2></div><button class="close-button" data-close="departureDialog" type="button" aria-label="Close departure check">×</button></div>
       <p class="muted">Only the changes. You don’t have to check everything.</p>
       <button id="departureReminder" class="departure-action" type="button"><strong>We need something next time</strong><span>Add a quick reminder →</span></button>
+      <button id="departureReturn" class="departure-action" type="button"><strong>Something needs to come home</strong><span>Add it to Take home →</span></button>
       <button id="departureItems" class="departure-action" type="button"><strong>We took something home</strong><span>Find it and tap “Took home” →</span></button>
       <button id="departurePhoto" class="departure-action" type="button"><strong>A closet or cabinet changed</strong><span>Update its photo →</span></button>
       <button id="finishDeparture" class="primary-button" type="button">All set for next time</button>
@@ -170,6 +175,12 @@
           Item<input id="itemName" name="name" autofocus placeholder="Phone charger, hiking boots…" required maxlength="200" autocomplete="off">
         </label>
         <label><span id="itemStatusLabel">Is it in Asheville?</span><select id="itemStatus" name="status"><option value="In stock">Yes, it’s here</option><option value="Out">Need to bring next time</option><option value="Running low">Running low</option><option value="Unknown">Not sure</option></select></label>
+        <label>
+          Room or storage spot<select id="itemRoom" name="room"></select>
+        </label>
+        <label id="newRoomField" class="hidden">
+          New room or storage spot<input id="itemNewRoom" name="newRoom" placeholder="Hall closet, pantry…" maxlength="100" autocomplete="off">
+        </label>
         <label class="photo-input-label">
           ▧ <span id="photoInputText">Add a photo (optional)</span><input id="itemPhoto" name="photo" type="file" accept="image/*">
         </label>
@@ -182,9 +193,6 @@
             <div class="field-row">
               <label>
                 Saved at<select id="itemHome" name="homeId"></select>
-              </label>
-              <label>
-                Room or storage spot<input id="itemRoom" name="room" list="roomSuggestions" placeholder="Kitchen, hall closet…" maxlength="100">
               </label>
             </div>
             <datalist id="roomSuggestions">
@@ -327,10 +335,11 @@
         <button id="confirmationCancel" class="secondary-button" type="button" autofocus>Keep it</button><button id="confirmationAccept" class="primary-button" type="button">Continue</button>
       </div>
     </dialog>
+    <div id="refreshStatus" class="toast hidden" role="status"></div>
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
     </div>
-    <script type="module" src="app.js?v=20261016-simple6"></script>
-    <script type="module" src="pwa.js?v=20261016-simple6"></script>
+    <script type="module" src="app.js?v=20261017-home4"></script>
+    <script type="module" src="pwa.js?v=20261017-home4"></script>
   </body>
 </html>

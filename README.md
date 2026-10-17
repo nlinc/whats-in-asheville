@@ -11,16 +11,23 @@ and what needs to go in the car next time.
   dictation is also available as a fallback.
 - Check things off as you pack. **Packed & done** keeps them available to uncheck.
   Checking a box never changes what is saved as already in Asheville.
-- **Already in Asheville** opens searchable items and closet/room photos. Add an
+- **Take home** keeps a separate checklist for things returning to Morganton.
+  Add with the same quick field or Speak; check off as they go in the car. It
+  preserves existing Morganton reminders and never moves inventory on its own.
+  Drafts stay separate between the two directions.
+- **Already there** shows a saved-entry count and opens searchable items and closet/room photos. Add an
   item with just its name; room, shelf, quantity, notes, and category are optional.
-  Existing data for both homes remains under **Other homes & filters**. Older
-  other-home reminders remain available below the main packing list.
+  The room picker can move a saved item to an existing room or add a new one.
+  Existing inventory for both homes remains under **Other homes & filters**.
 - In Asheville, **Took home** marks an item to bring next time; **Here now** records
   that it is present. Low/missing/uncertain items also appear on the packing list.
 - **Leaving Asheville?** offers a short checkpoint: save a reminder, record what
   came home, or update a changed room photo. Only update what changed. A room’s
   **Still looks right** action checks that particular photo. Dates never imply
   that an unrelated save checked the whole inventory.
+- **↻ Refresh app** checks for and applies a new app version, or reloads the
+  current version. It keeps saved data and asks you to finish forms, drafts in
+  either list, or in-flight sharing first. Other windows are not reloaded.
 - **Settings & sharing** holds Google sign-in, home names, backup import/export,
   and Home Screen installation instructions.
 - On iPhone: Safari → Share → Add to Home Screen, leaving Open as Web App enabled
@@ -59,8 +66,8 @@ sign-in. After one online visit, the service worker caches the app shell for off
 startup. Inventory saved on that device remains available. Sharing and cloud
 photos need a connection. Reopen online to review and share offline changes.
 The worker caches only public app assets, never Firebase or authentication
-responses. Updates activate after all old app windows/tabs close; an open form
-is never force-reloaded.
+responses. Updates activate after old windows close, or when you explicitly tap ↻ Refresh
+app. Only that window reloads, after checking that no work is unfinished.
 
 The manifest, service worker, and icons are static files; there are still no
 build dependencies. The twelve-file Hosting allowlist is documented in AGENTS.md.

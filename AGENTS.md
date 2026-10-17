@@ -4,7 +4,7 @@
 
 Remembers what is in Asheville and what to bring next time for Nick and Christina.
 The main view follows the device’s current location: Morganton → pack for Asheville;
-Asheville → capture next-time reminders and a short departure checkpoint. Location
+Asheville → capture next-time and take-home reminders, plus a short departure checkpoint. Location
 selection is a device preference, not an inventory filter or a shared household
 setting. Asheville memory (items and room photos) is secondary; saved Morganton
 inventory and older reminders remain accessible. Single household, two allowed
@@ -50,8 +50,13 @@ Firebase's general `**/.*` pattern does not exclude their contents.
   `photoUpdatedAt` and `checkedAt`. Old data defaults these safely. A packing check
   never changes inventory status. Only an explicit inventory update / Here now
   changes what is present. Completed reminders persist and can be unchecked;
-  switching locations never clears or resets them. Other-home reminders remain
-  in a collapsed section, and other-home inventory in the memory filter.
+  switching locations never clears or resets them. Take home uses existing tasks
+  with `homeId: morganton`; Next time/packing uses `homeId: asheville`. Neither
+  direction moves inventory automatically. Draft text stays separate between the
+  two lists; Browser Back restores the selected list. Other-home inventory stays
+  in the memory filter; reminders for additional homes stay in a collapsed section.
+  The Already there tab shows a saved-entry count so stock is visible even when
+  the packing list is empty.
 - Voice capture: optional native SpeechRecognition/webkitSpeechRecognition in
   app.js, started only by a tap. It fills an editable reminder; Add is explicit.
   Cancel capture on navigation/backgrounding and preserve typing on errors.
@@ -61,6 +66,10 @@ Firebase's general `**/.*` pattern does not exclude their contents.
 - Installable app: `manifest.webmanifest`, `sw.js`, `pwa.js`, and `icons/` (the SVG
   mark, 192px/512px PNG icons, and 180px Apple touch icon). No native wrapper or
   build step. `pwa.js` also fits dialogs to the visual viewport above a keyboard.
+- Item room picker: a native select lists defaults, saved item rooms, and room
+  photos for the item’s saved home. It preserves existing custom room names.
+  Add a new room reveals a required name field. Room is visible outside optional
+  details; home selection remains inside those details.
 - Item and room-photo forms scroll their fields independently; their Save footers
   remain visible. Keep this separation when editing these forms.
 - Navigation: the History API tracks homes, rooms, views, and open dialogs.
@@ -90,7 +99,10 @@ a `package.json` just to have "a loop." Verify manually instead:
    it in a browser. Do not rely on opening `index.html` as a `file://` URL because
    the app uses ES modules. Exercise the flow you touched:
    - **Local mode** (no sign-in): add/edit an item through the Add item dialog;
-     use its status select for Have it/Running low/Need it/Not sure. Swipe right
+     change a saved item’s room using the native picker and add a custom room.
+     Reopen/reload to verify its room, photo, details, and packing check survive;
+     switching the item’s saved home must refresh that home’s room choices.
+     Use its status select for Have it/Running low/Need it/Not sure. Swipe right
      and left, then Undo. Delete through the edit dialog and check both cancel
      and confirm. Attach/replace/remove an item photo and open it full size.
    - **Room photos**: Quick photo creates a standalone room/closet card without
@@ -98,6 +110,9 @@ a `package.json` just to have "a loop." Verify manually instead:
      renaming a photographed room (its items move along with it).
    - **Current location**: Morganton opens the packing list; Asheville opens
      next-time capture. The same Asheville reminders/needs appear in both.
+     Take home adds/checks/copies a separate Morganton-bound list, including
+     existing Morganton reminders. Switch between lists, preserve each draft,
+     reload, and use Back; checking a take-home task must not move inventory.
      Location is remembered on this device only. Other saved home inventory is
      reachable under Other homes & filters; older reminders remain accessible.
    - **Packing/capture**: add with text only, check/uncheck, remove/Undo, copy.
@@ -105,7 +120,8 @@ a `package.json` just to have "a loop." Verify manually instead:
      explicitly updates it after arrival. Completed reminders must survive reload
      and location switches; a repeated completed reminder reopens without duplicates.
    - **Upkeep**: exercise all Leaving Asheville checkpoint paths. Took home adds
-     an inventory need; Here now removes it. Refresh only a changed photo or use
+     an inventory need; Here now removes it. The departure Take home shortcut
+     opens the Morganton-bound list with capture ready. Refresh only a changed photo or use
      Still looks right for that specific room. Other edits and All set must not
      stamp every photo as checked. Show saved dates honestly for older records.
    - **Voice**: verify final transcript is editable before Add, errors/denial,
@@ -128,12 +144,20 @@ a `package.json` just to have "a loop." Verify manually instead:
      its firebase-client import with matching release query strings. Bump them
      together when changing browser assets so cached versions cannot mix. Also
      bump the release in sw.js and update its explicit ASSETS list. Service-worker
-     updates wait for all old app windows to close; never force-reload a form.
+     updates wait normally. The explicit ↻ Refresh app button in pwa.js checks for
+     updates and requests activation of a waiting worker via APPLY_UPDATE. Only
+     the requesting window reloads. Block refresh for open dialogs, drafts in
+     either list, active voice capture, unresolved shared-list choices, and in-flight
+     sharing (tracked through the save promise, not just the status label). Recheck
+     safety after async installation and controllerchange; never reload a form.
    - **Installation/offline**: check manifest fields and all icon dimensions;
      Settings must show installation instructions and offline readiness. After
      caching, stop the local HTTP server and cold-reload the app, then add/edit an
      item. The worker must bypass Firebase, authentication, cloud photos, and
      unknown routes. Verify cache update/cleanup separately from household data.
+     Test the explicit Refresh button with a staged newer worker and saved data,
+     no available update, offline/error cases, both-list drafts, and an edit begun
+     during update installation. Other windows must not auto-reload.
    - **Phone keyboard/back**: test a 390px-wide viewport with only 350px of height;
      scroll to Notes and save with the footer still visible. Check actual phone
      keyboard behavior after release. Back must restore rooms/views, close forms,

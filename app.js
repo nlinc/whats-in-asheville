@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261016-simple6";
+import { firebaseService } from "./firebase-client.js?v=20261017-home4";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -17,6 +17,7 @@ try { if (localStorage.getItem(LOCATION_KEY) === "asheville") currentLocation = 
 let activeHome = "asheville";
 let activeRoom = "All";
 let activeView = "trip";
+const reminderDrafts = { asheville: "", morganton: "" };
 let navigationDepth = 0;
 let navigationReady = false;
 let restoringNavigation = false;
@@ -29,6 +30,7 @@ let placePhotoChanged = false;
 let editingPlaceId = null;
 let photoJob = 0;
 let resolvingRemoteState = false;
+let pendingCloudSaves = 0;
 let toastTimer;
 let undoAction = null;
 
@@ -113,7 +115,7 @@ function setupNavigation() {
         dialog.close();
       }
     });
-    switchView(next.view === "trip" ? "trip" : "inventory", false);
+    switchView(["trip", "return", "inventory"].includes(next.view) ? next.view : "trip", false);
     render();
     restoringNavigation = false;
     // Never reopen a stale edit form when the user goes forward.
@@ -180,6 +182,7 @@ function normalizeState(raw = {}) {
     return { id: home.id, name: home.name.trim().slice(0, 80) };
   }) : defaultHomes.map((home) => ({ ...home }));
   if (!homes.some((home) => home.id === "asheville")) homes.unshift({ ...defaultHomes[0] });
+  if (!homes.some((home) => home.id === "morganton")) homes.push({ ...defaultHomes[1] });
   if (new Set(homes.map((home) => home.id)).size !== homes.length) throw new Error("Duplicate home IDs in backup.");
   const homeIds = new Set(homes.map((home) => home.id));
   const field = (value) => typeof value === "string" ? value : "";
@@ -236,6 +239,7 @@ async function saveState() {
 }
 async function saveCloudState() {
   if (!firebaseService.ready) return false;
+  pendingCloudSaves++;
   updateSyncStatus({ mode: "saving", message: "Saving your changes to the shared list…" });
   try {
     // Photos captured while signed out move to Storage before sharing the document.
@@ -260,6 +264,8 @@ async function saveCloudState() {
     setDirty(true);
     updateSyncStatus({ mode: "error", message: `Saved on this device. Sharing needs attention: ${error.message}` });
     return false;
+  } finally {
+    pendingCloudSaves--;
   }
 }
 function showToast(message, undo = null) {
@@ -343,18 +349,24 @@ function renderHomes() {
     el.setAttribute("aria-pressed", String(currentLocation === homeId)); $("#homeNav").append(el);
   });
   const atCondo = currentLocation === "asheville";
+  const takingHome = activeView === "return";
   $("#main").classList.toggle("at-asheville", atCondo);
-  $("#memoryTab").textContent = activeHome === "All" ? "Saved in both homes" : `Already in ${homeName(activeHome)}`;
+  const memoryLabel = activeHome === "All" ? "Both homes" : activeHome === "asheville" ? "Already there" : `In ${homeName(activeHome)}`;
+  const memoryCount = state.items.filter(isHere).length + state.places.filter(isHere).length;
+  $("#memoryTab").replaceChildren(document.createTextNode(`${memoryLabel} `), textNode("span", String(memoryCount), "tab-count"));
+  $("#memoryTab").setAttribute("aria-label", `Already in ${activeHome === "All" ? "both homes" : homeName(activeHome)}: ${memoryCount} saved entries`);
   $("#homeEyebrow").textContent = `You’re in ${homeName(currentLocation)}`;
   const title = $("#todayHeading");
-  title.replaceChildren(document.createTextNode(atCondo ? "Remember for " : "Pack for "), textNode("em", atCondo ? "next time." : `${homeName("asheville")}.`));
-  $("#heroDescription").textContent = atCondo ? "Notice it. Save it. It’ll be on your list when you pack." : "What to bring. What’s already there. Less to remember.";
+  title.replaceChildren(document.createTextNode(takingHome ? "Take it " : atCondo ? "Remember for " : "Pack for "), textNode("em", takingHome ? "home." : atCondo ? "next time." : `${homeName("asheville")}.`));
+  $("#heroDescription").textContent = takingHome ? `Remember what needs to come back to ${homeName("morganton")}.` : atCondo ? "Notice it. Save it. It’ll be on your list when you pack." : "What to bring. What’s already there. Less to remember.";
   $("#todayTab").firstChild.textContent = atCondo ? "Next time " : "Packing list ";
   $("#leavingAsheville").classList.toggle("hidden", !atCondo);
   $("#leavingAsheville").textContent = `Leaving ${homeName("asheville")}? →`;
-  $("#captureLabel").textContent = atCondo ? "What do we need next time?" : "What needs to go in the car?";
-  $("#packingHeading").textContent = atCondo ? "Bring next time" : "Into the car";
-  $("#packingHelp").textContent = atCondo ? "Add it now. It’ll be here when you pack." : "Check it off once it’s in the car.";
+  $("#captureLabel").textContent = takingHome ? "What needs to come home?" : atCondo ? "What do we need next time?" : "What needs to go in the car?";
+  $("#packingHeading").textContent = takingHome ? `Back to ${homeName("morganton")}` : atCondo ? "Bring next time" : "Into the car";
+  $("#packingHelp").textContent = takingHome ? "Check it off once it’s in the car for home." : atCondo ? "Add it now. It’ll be here when you pack." : "Check it off once it’s in the car.";
+  $("#emptyPacking").textContent = takingHome ? "Nothing to take home yet. Add it when you think of it." : "Nothing to bring yet. Add it the moment you think of it.";
+  $("#taskText").placeholder = takingHome ? "Laundry, laptop, cooler…" : "Coffee, chargers, hiking boots…";
   $("#updateMemory").classList.toggle("hidden", !atCondo);
   const memorySelect = $("#memoryHome");
   memorySelect.replaceChildren(...state.homes.map((home) => new Option(home.name, home.id)), new Option("Both homes", "All")); memorySelect.value = activeHome;
@@ -550,17 +562,38 @@ async function updateStatus(itemId, status) {
   });
 }
 function clearFilters() { activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All"; renderInventory(); rememberNavigation(); }
+function listHome() { return activeView === "return" ? "morganton" : "asheville"; }
 function switchView(view, remember = true) {
-  if (activeView !== view) stopVoice();
-  activeView = view;
+  if (activeView !== view) {
+    stopVoice();
+    if (activeView === "trip" || activeView === "return") reminderDrafts[listHome()] = $("#taskText").value;
+    activeView = view;
+    if (view === "trip" || view === "return") $("#taskText").value = reminderDrafts[listHome()];
+  }
   document.querySelectorAll(".tab").forEach((tab) => { tab.classList.toggle("active", tab.dataset.view === view); tab.setAttribute("aria-pressed", String(tab.dataset.view === view)); });
-  document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `${view}View`));
+  document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `${view === "return" ? "trip" : view}View`));
+  renderHomes(); renderTasks();
   if (remember) rememberNavigation();
 }
 function render() {
   renderHomes(); renderInventory(); renderTasks();
   const date = new Date(state.updatedAt);
   $("#lastUpdated").textContent = Number.isNaN(date.getTime()) ? "" : `Updated ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date)}`;
+}
+function fillItemRooms(homeId, selected = "Unsorted") {
+  const rooms = [...new Set(["Unsorted", ...defaultRooms,
+    ...state.items.filter((item) => item.homeId === homeId).map((item) => item.room),
+    ...state.places.filter((place) => place.homeId === homeId).map((place) => place.name),
+    ...(selected ? [selected] : [])])].sort((a, b) => a.localeCompare(b));
+  $("#itemRoom").replaceChildren(...rooms.map((room) => new Option(room === "Unsorted" ? "No room yet" : room, room)), new Option("+ Add a new room…", ""));
+  $("#itemRoom").value = selected;
+  showNewRoomField();
+}
+function showNewRoomField(focus = false) {
+  const adding = $("#itemRoom").value === "";
+  $("#newRoomField").classList.toggle("hidden", !adding);
+  $("#itemNewRoom").required = adding;
+  if (adding && focus) $("#itemNewRoom").focus();
 }
 function openItem() {
   editingItemId = null; itemPhoto = ""; itemPhotoChanged = false; photoJob++;
@@ -569,7 +602,7 @@ function openItem() {
   $("#deleteEditingItem").classList.add("hidden");
   fillHomeSelect($("#itemHome"), activeHome);
   $("#itemStatusLabel").textContent = `Is it in ${homeName($("#itemHome").value)}?`;
-  $("#itemRoom").value = activeRoom === "All" ? "" : activeRoom;
+  fillItemRooms($("#itemHome").value, activeRoom === "All" ? "Unsorted" : activeRoom);
   updatePhotoPreview("item", "");
   showDialog($("#itemDialog"));
 }
@@ -581,6 +614,7 @@ function editItem(itemId) {
   $("#deleteEditingItem").classList.remove("hidden");
   for (const [field, selector] of Object.entries({ name: "#itemName", homeId: "#itemHome", room: "#itemRoom", category: "#itemCategory", status: "#itemStatus", quantity: "#itemQuantity", location: "#itemLocation", notes: "#itemNotes" })) $(selector).value = item[field] || "";
   $("#itemStatusLabel").textContent = `Is it in ${homeName(item.homeId)}?`;
+  fillItemRooms(item.homeId, item.room);
   itemPhoto = item.photo; updatePhotoPreview("item", itemPhoto);
 }
 function updatePhotoPreview(kind, photo) {
@@ -635,12 +669,14 @@ async function submitItem(event) {
   if ($("#itemFormSubmit").disabled) return;
   const form = new FormData(event.target);
   const name = form.get("name").trim(); if (!name) { $("#itemName").focus(); return; }
+  const room = (form.get("room") || form.get("newRoom") || "").trim();
+  if (!room) { $("#itemNewRoom").focus(); return; }
   const recordId = editingItemId || id();
   const oldItem = state.items.find((item) => item.id === editingItemId);
   $("#itemFormSubmit").disabled = true; $("#itemFormError").textContent = "";
   try {
     const photo = await cloudPhoto(itemPhoto, itemPhotoChanged, recordId);
-    const item = { ...oldItem, id: recordId, name, homeId: form.get("homeId"), room: form.get("room").trim() || "Unsorted", category: form.get("category"), status: form.get("status"), quantity: form.get("quantity").trim(), location: form.get("location").trim(), notes: form.get("notes").trim(), photo, packedForTrip: oldItem?.status === form.get("status") && oldItem?.homeId === form.get("homeId") ? oldItem.packedForTrip : false, checkedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const item = { ...oldItem, id: recordId, name, homeId: form.get("homeId"), room, category: form.get("category"), status: form.get("status"), quantity: form.get("quantity").trim(), location: form.get("location").trim(), notes: form.get("notes").trim(), photo, packedForTrip: oldItem?.status === form.get("status") && oldItem?.homeId === form.get("homeId") ? oldItem.packedForTrip : false, checkedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     if (oldItem) state.items = state.items.map((entry) => entry.id === recordId ? item : entry); else state.items.unshift(item);
     const saved = await saveState();
     if (saved === null) { $("#itemFormError").textContent = "Device storage is full. Your item was not saved. Export a backup in settings."; return; }
@@ -705,11 +741,11 @@ function openLightbox(entry) {
   $("#lightboxNotes").textContent = entry.notes || "";
   showDialog($("#lightbox"));
 }
-// One destination list follows you between homes. Packing never claims arrival.
+// Reminder destinations keep the two directions separate. Packing never claims arrival.
 function tripNeeds() { return state.items.filter((item) => item.homeId === "asheville" && item.status !== "In stock"); }
 async function setPacked(entry, isItem, done) {
   if (isItem) entry.packedForTrip = done; else entry.done = done;
-  savedMessage(await saveState(), done ? "Checked off. What’s already in Asheville is unchanged." : "Back on your list.");
+  savedMessage(await saveState(), done ? "Checked off. Saved inventory is unchanged." : "Back on your list.");
 }
 function reminderRow(entry, isItem = false) {
   const done = isItem ? entry.packedForTrip : entry.done;
@@ -721,7 +757,7 @@ function reminderRow(entry, isItem = false) {
   check.addEventListener("change", () => setPacked(entry, isItem, check.checked));
   const copy = textNode("span", "", "packing-copy"); copy.append(textNode("span", name));
   if (isItem) copy.append(textNode("small", `${entry.room} · ${statuses[entry.status]}`));
-  else if (entry.homeId !== "asheville") copy.append(textNode("small", homeName(entry.homeId)));
+  else if (entry.homeId !== listHome()) copy.append(textNode("small", homeName(entry.homeId)));
   label.append(check, copy); row.append(label);
   if (isItem) {
     if (currentLocation === "asheville") row.append(button(entry.status === "Running low" ? "Restocked" : "Here now", "text-button", () => updateStatus(entry.id, "In stock"), `${entry.name} ${entry.status === "Running low" ? "is restocked" : "is now in Asheville"}`));
@@ -736,33 +772,36 @@ function reminderRow(entry, isItem = false) {
   return row;
 }
 function renderTasks() {
-  const tasks = state.tasks.filter((task) => task.homeId === "asheville");
-  const needs = tripNeeds();
+  const tasks = state.tasks.filter((task) => task.homeId === listHome());
+  const needs = activeView === "return" ? [] : tripNeeds();
   const pending = [...needs.filter((item) => !item.packedForTrip).map((entry) => reminderRow(entry, true)), ...tasks.filter((task) => !task.done).map((entry) => reminderRow(entry))];
   const completed = [...needs.filter((item) => item.packedForTrip).map((entry) => reminderRow(entry, true)), ...tasks.filter((task) => task.done).map((entry) => reminderRow(entry))];
   $("#packingList").replaceChildren(...pending); $("#completedList").replaceChildren(...completed);
-  $("#tripTaskCount").textContent = pending.length;
+  $("#tripTaskCount").textContent = state.tasks.filter((task) => task.homeId === "asheville" && !task.done).length + tripNeeds().filter((item) => !item.packedForTrip).length;
+  $("#returnTaskCount").textContent = state.tasks.filter((task) => task.homeId === "morganton" && !task.done).length;
   $("#packingCount").textContent = pending.length ? `${pending.length} to remember` : "";
   $("#emptyPacking").classList.toggle("hidden", Boolean(pending.length));
   $("#completedPacking").classList.toggle("hidden", !completed.length);
   $("#completedSummary").textContent = `Packed & done (${completed.length})`;
-  const others = state.tasks.filter((task) => task.homeId !== "asheville");
+  const others = state.tasks.filter((task) => !["asheville", "morganton"].includes(task.homeId));
   $("#otherReminders").classList.toggle("hidden", !others.length); $("#otherRemindersList").replaceChildren(...others.map((entry) => reminderRow(entry)));
 }
 async function addTask(event) {
   event.preventDefault(); stopVoice();
   const text = $("#taskText").value.trim(); if (!text) return;
-  const existing = state.tasks.find((task) => task.homeId === "asheville" && task.text.toLocaleLowerCase() === text.toLocaleLowerCase());
+  const destination = listHome();
+  const existing = state.tasks.find((task) => task.homeId === destination && task.text.toLocaleLowerCase() === text.toLocaleLowerCase());
   if (existing) existing.done = false;
-  else state.tasks.unshift({ id: id(), text, type: "Bring", done: false, homeId: "asheville" });
+  else state.tasks.unshift({ id: id(), text, type: "Bring", done: false, homeId: destination });
   const saved = await saveState();
-  if (saved !== null) { $("#taskText").value = ""; savedMessage(saved, "On your next-trip list."); }
+  if (saved !== null) { reminderDrafts[destination] = ""; if (listHome() === destination) $("#taskText").value = ""; savedMessage(saved, destination === "morganton" ? `On your take-home list for ${homeName(destination)}.` : "On your next-trip list."); }
 }
 async function copyChecklist() {
-  const tasks = state.tasks.filter((task) => task.homeId === "asheville" && !task.done);
-  const lines = [...tripNeeds().filter((item) => !item.packedForTrip).map((item) => `- [ ] ${item.status === "Unknown" ? "Check: " : ""}${item.name}`), ...tasks.map((task) => `- [ ] ${task.type !== "Bring" ? `${task.type}: ` : ""}${task.text}`)];
+  const destination = listHome();
+  const tasks = state.tasks.filter((task) => task.homeId === destination && !task.done);
+  const lines = [...(destination === "asheville" ? tripNeeds() : []).filter((item) => !item.packedForTrip).map((item) => `- [ ] ${item.status === "Unknown" ? "Check: " : ""}${item.name}`), ...tasks.map((task) => `- [ ] ${task.type !== "Bring" ? `${task.type}: ` : ""}${task.text}`)];
   if (!lines.length) { showToast("Nothing left on your packing list."); return; }
-  try { await navigator.clipboard.writeText(`Bring to ${homeName("asheville")}
+  try { await navigator.clipboard.writeText(`Bring to ${homeName(destination)}
 
 ${lines.join("\n")}`); showToast("Packing list copied."); }
   catch { showToast("Copy wasn’t available. Try from your usual browser."); }
@@ -851,13 +890,17 @@ function setup() {
   $("#itemDialog").addEventListener("close", () => { photoJob++; });
   $("#placeDialog").addEventListener("close", () => { photoJob++; });
   $("#itemForm").addEventListener("submit", submitItem);
-  $("#itemHome").addEventListener("change", () => { $("#itemStatusLabel").textContent = `Is it in ${homeName($("#itemHome").value)}?`; });
+  $("#itemHome").addEventListener("change", () => {
+    $("#itemStatusLabel").textContent = `Is it in ${homeName($("#itemHome").value)}?`;
+    fillItemRooms($("#itemHome").value, $("#itemRoom").value);
+  });
+  $("#itemRoom").addEventListener("change", () => showNewRoomField(true));
   $("#deleteEditingItem").addEventListener("click", deleteItem);
   $("#itemPhoto").addEventListener("change", (event) => selectPhoto(event, "item"));
   $("#removePhoto").addEventListener("click", () => { photoJob++; itemPhoto = ""; itemPhotoChanged = true; $("#itemPhoto").value = ""; $("#itemFormSubmit").disabled = false; updatePhotoPreview("item", ""); });
   $("#quickPhoto").addEventListener("click", () => openPlace());
   $("#memoryPhoto").addEventListener("click", () => openPlace());
-  $("#photoInstead").addEventListener("click", async () => { const room = $("#itemRoom").value, home = $("#itemHome").value; await closeDialog($("#itemDialog")); openPlace(room, home); });
+  $("#photoInstead").addEventListener("click", async () => { const room = $("#itemRoom").value || $("#itemNewRoom").value.trim(), home = $("#itemHome").value; await closeDialog($("#itemDialog")); openPlace(room === "Unsorted" ? "" : room, home); });
   $("#placePhoto").addEventListener("change", (event) => selectPhoto(event, "place"));
   $("#removePlacePhoto").addEventListener("click", () => { photoJob++; placePhoto = ""; placePhotoChanged = true; $("#placePhoto").value = ""; $("#savePlace").disabled = false; updatePhotoPreview("place", ""); });
   $("#placeForm").addEventListener("submit", submitPlace);
@@ -868,12 +911,24 @@ function setup() {
   $("#backToRooms").addEventListener("click", clearFilters);
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   $("#taskForm").addEventListener("submit", addTask);
+  $("#taskText").addEventListener("input", () => {
+    if (activeView === "trip" || activeView === "return") reminderDrafts[listHome()] = $("#taskText").value;
+  });
+  document.addEventListener("whatswhere:before-refresh", (event) => {
+    let message = "";
+    if (document.querySelector("dialog[open]")) message = "Finish or close the open form before refreshing.";
+    else if ($("#taskText").value.trim() || Object.values(reminderDrafts).some((draft) => draft.trim())) message = "Save or clear unfinished reminders in both lists before refreshing.";
+    else if (voiceSession) message = "Finish voice capture before refreshing.";
+    else if (resolvingRemoteState || pendingCloudSaves > 0 || $("#syncDot").classList.contains("saving")) message = "Wait for sharing to finish, then refresh.";
+    if (message) { event.detail.message = message; event.preventDefault(); }
+  });
   $("#copyChecklist").addEventListener("click", copyChecklist);
   $("#memoryHome").addEventListener("change", (event) => selectHome(event.target.value));
   $("#checkMemory").addEventListener("click", () => showMemory());
   $("#updateMemory").addEventListener("click", () => showMemory());
   $("#leavingAsheville").addEventListener("click", () => showDialog($("#departureDialog")));
   $("#departureReminder").addEventListener("click", async () => { await closeDialog($("#departureDialog")); switchView("trip"); $("#taskText").focus(); });
+  $("#departureReturn").addEventListener("click", async () => { await closeDialog($("#departureDialog")); switchView("return"); $("#taskText").focus(); });
   $("#departureItems").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(true); showToast("Find what you took home, then tap Took home."); });
   $("#departurePhoto").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(); showToast("Tap the camera on the space that changed, or add a new photo."); });
   $("#finishDeparture").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showToast("Ready for next time. Your list is saved."); });

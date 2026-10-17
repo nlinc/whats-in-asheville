@@ -2086,3 +2086,17 @@ summary>span,.optional {
   .capture-input .voice-button[aria-pressed=true] { color: var(--orange); }
   .capture-help { margin-top: 3px; }
 }
+/* Three short choices: next visit, the drive home, and saved memory. */
+.view-tabs { overflow-x: auto; scrollbar-width: none; }
+.view-tabs::-webkit-scrollbar { display: none; }
+.tab { flex-shrink: 0; white-space: nowrap; }
+@media(max-width:760px) {
+  .view-tabs { gap: 12px; }
+  .tab { font-size: 11px; gap: 5px; }
+  .tab-count { min-width: 16px; padding: 1px 4px; }
+}
+.rail-actions { display: grid; gap: 5px; }
+@media(max-width:760px) {
+  .rail-actions { display: flex; gap: 8px; }
+  #refreshApp .refresh-label { display: none; }
+}

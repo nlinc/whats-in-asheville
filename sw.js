@@ -1,13 +1,13 @@
 // Cache only this release's public app shell. Never intercept Firebase/auth/photo requests.
 const CACHE_PREFIX = "whats-where-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261016-simple6`;
+const CACHE_NAME = `${CACHE_PREFIX}20261017-home4`;
 const ASSETS = [
   "./index.html",
-  "./styles.css?v=20261016-simple6",
-  "./app.js?v=20261016-simple6",
-  "./firebase-client.js?v=20261016-simple6",
+  "./styles.css?v=20261017-home4",
+  "./app.js?v=20261017-home4",
+  "./firebase-client.js?v=20261017-home4",
   "./firebase-config.js",
-  "./pwa.js?v=20261016-simple6",
+  "./pwa.js?v=20261017-home4",
   "./manifest.webmanifest",
   "./icons/app-icon.svg",
   "./icons/icon-192.png",
@@ -19,7 +19,10 @@ const indexURL = new URL("./index.html", self.registration.scope).href;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
-  // Let updates wait until all old app windows close; never reload an open form.
+  // Wait normally; only an explicit Refresh action requests early activation.
+});
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "APPLY_UPDATE") event.waitUntil(self.skipWaiting());
 });
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
