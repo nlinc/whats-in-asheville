@@ -11,16 +11,19 @@ and what needs to go in the car next time.
   dictation is also available as a fallback.
 - Check things off as you pack. **Packed & done** keeps them available to uncheck.
   Checking a box never changes what is saved as already in Asheville.
-- **Take home** keeps a separate checklist for things returning to Morganton.
+- **To Morganton** keeps a separate checklist for things returning to Morganton.
   Add with the same quick field or Speak; check off as they go in the car. It
   preserves existing Morganton reminders and never moves inventory on its own.
   Drafts stay separate between the two directions.
-- **Already there** shows a saved-entry count and opens searchable items and closet/room photos. Add an
-  item with just its name; room, shelf, quantity, notes, and category are optional.
+- **To Asheville**, **To Morganton**, and **In Asheville** name each destination explicitly.
+- **In Asheville** shows a saved-entry count and opens searchable items first,
+  followed by closet/room photos. Add an item with just its name; room, shelf, quantity, notes, and category are optional.
   The room picker can move a saved item to an existing room or add a new one.
   Existing inventory for both homes remains under **Other homes & filters**.
-- In Asheville, **Took home** marks an item to bring next time; **Here now** records
-  that it is present. Low/missing/uncertain items also appear on the packing list.
+- Tap an item’s status to update it immediately: **Running low**, **Used up**,
+  **Have it / Restocked**, or **Not sure**, with Undo. In Asheville the same picker
+  also offers **Took home**. Used up and Took home both mark it to bring next time.
+  Low/missing/uncertain items also appear on the packing list.
 - **Leaving Asheville?** offers a short checkpoint: save a reminder, record what
   came home, or update a changed room photo. Only update what changed. A room’s
   **Still looks right** action checks that particular photo. Dates never imply

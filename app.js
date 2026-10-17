@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261017-home4";
+import { firebaseService } from "./firebase-client.js?v=20261017-simple6";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -351,23 +351,31 @@ function renderHomes() {
   const atCondo = currentLocation === "asheville";
   const takingHome = activeView === "return";
   $("#main").classList.toggle("at-asheville", atCondo);
-  const memoryLabel = activeHome === "All" ? "Both homes" : activeHome === "asheville" ? "Already there" : `In ${homeName(activeHome)}`;
+  const memoryLabel = activeHome === "All" ? "In both homes" : `In ${homeName(activeHome)}`;
   const memoryCount = state.items.filter(isHere).length + state.places.filter(isHere).length;
   $("#memoryTab").replaceChildren(document.createTextNode(`${memoryLabel} `), textNode("span", String(memoryCount), "tab-count"));
-  $("#memoryTab").setAttribute("aria-label", `Already in ${activeHome === "All" ? "both homes" : homeName(activeHome)}: ${memoryCount} saved entries`);
+  $("#memoryTab").setAttribute("aria-label", `${memoryLabel}: ${memoryCount} saved entries`);
   $("#homeEyebrow").textContent = `You’re in ${homeName(currentLocation)}`;
   const title = $("#todayHeading");
-  title.replaceChildren(document.createTextNode(takingHome ? "Take it " : atCondo ? "Remember for " : "Pack for "), textNode("em", takingHome ? "home." : atCondo ? "next time." : `${homeName("asheville")}.`));
-  $("#heroDescription").textContent = takingHome ? `Remember what needs to come back to ${homeName("morganton")}.` : atCondo ? "Notice it. Save it. It’ll be on your list when you pack." : "What to bring. What’s already there. Less to remember.";
-  $("#todayTab").firstChild.textContent = atCondo ? "Next time " : "Packing list ";
+  const remembering = activeView === "inventory";
+  const destination = remembering ? activeHome === "All" ? "both homes" : homeName(activeHome) : homeName(takingHome ? "morganton" : "asheville");
+  title.replaceChildren(document.createTextNode(remembering ? "In " : takingHome ? "Bring to " : atCondo ? "Next visit to " : "Pack for "), textNode("em", `${destination}.`));
+  $("#heroDescription").textContent = remembering ? "What you’ve saved, ready when you need it." : takingHome ? `Remember what needs to come back to ${homeName("morganton")}.` : atCondo ? "Notice it. Save it. It’ll be on your list when you pack." : "What to bring. What’s already there. Less to remember.";
+  $("#todayTab").firstChild.textContent = `To ${homeName("asheville")} `;
+  $("#returnTab").firstChild.textContent = `To ${homeName("morganton")} `;
+  $("#departureReturn span").textContent = `Add to the ${homeName("morganton")} list →`;
+  $("#searchInput").setAttribute("aria-label", `Search in ${activeHome === "All" ? "both homes" : homeName(activeHome)}`);
+  $("#searchInput").placeholder = `Search in ${activeHome === "All" ? "both homes" : homeName(activeHome)}…`;
   $("#leavingAsheville").classList.toggle("hidden", !atCondo);
   $("#leavingAsheville").textContent = `Leaving ${homeName("asheville")}? →`;
-  $("#captureLabel").textContent = takingHome ? "What needs to come home?" : atCondo ? "What do we need next time?" : "What needs to go in the car?";
-  $("#packingHeading").textContent = takingHome ? `Back to ${homeName("morganton")}` : atCondo ? "Bring next time" : "Into the car";
+  $("#captureLabel").textContent = takingHome ? `Bring to ${homeName("morganton")}` : atCondo ? `For next time in ${homeName("asheville")}` : `Bring to ${homeName("asheville")}`;
+  $("#packingHeading").textContent = takingHome ? `To ${homeName("morganton")}` : atCondo ? "Bring next visit" : "Into the car";
   $("#packingHelp").textContent = takingHome ? "Check it off once it’s in the car for home." : atCondo ? "Add it now. It’ll be here when you pack." : "Check it off once it’s in the car.";
   $("#emptyPacking").textContent = takingHome ? "Nothing to take home yet. Add it when you think of it." : "Nothing to bring yet. Add it the moment you think of it.";
   $("#taskText").placeholder = takingHome ? "Laundry, laptop, cooler…" : "Coffee, chargers, hiking boots…";
   $("#updateMemory").classList.toggle("hidden", !atCondo);
+  $("#updateMemory").textContent = `Update what’s in ${homeName("asheville")} →`;
+  $("#checkMemory small").textContent = `Look at what’s in ${homeName("asheville")} before packing more.`;
   const memorySelect = $("#memoryHome");
   memorySelect.replaceChildren(...state.homes.map((home) => new Option(home.name, home.id)), new Option("Both homes", "All")); memorySelect.value = activeHome;
   $("#roomSuggestions").replaceChildren(...[...new Set([...defaultRooms, ...state.items.filter(isHere).map((item) => item.room), ...state.places.filter(isHere).map((place) => place.name)])].map((room) => new Option(room)));
@@ -457,11 +465,12 @@ function renderRooms() {
   $("#roomOverview").replaceChildren();
   if (activeRoom !== "All" && !searching) {
     const place = state.places.find((entry) => isHere(entry) && entry.name === activeRoom);
+    if (!place) return;
     const card = textNode("div", "", "room-overview-card");
     if (place?.photo) {
       const photoButton = button("", "overview-photo", () => openLightbox({ ...place, room: place.name }), `View photo of ${activeRoom}`);
       const img = document.createElement("img"); img.src = place.photo; img.alt = `${activeRoom} overview`; photoButton.append(img); card.append(photoButton);
-    } else card.append(roomArt(activeRoom));
+    }
     const info = textNode("div", "");
     info.append(textNode("p", homeName(activeHome), "eyebrow"), textNode("h2", activeRoom), textNode("p", place?.notes || "A photo is an easy way to remember what’s in here."), button(place?.photo ? "Update room photo ↗" : "▧ Take a quick photo", "text-button", () => openPlace(activeRoom)));
     if (place?.photo) {
@@ -481,7 +490,7 @@ function renderInventory() {
   renderRooms();
   const items = filteredItems();
   const term = $("#searchInput").value.trim();
-  $("#listHeading").textContent = term ? `Results for “${term}”` : activeRoom !== "All" ? "What’s in here" : activeHome === "All" ? "Everything, everywhere" : "Everything here";
+  $("#listHeading").textContent = term ? `Results for “${term}”` : activeRoom !== "All" ? `${activeRoom} · ${homeName(activeHome)}` : activeHome === "All" ? "In both homes" : `In ${homeName(activeHome)}`;
   $("#listEyebrow").textContent = term ? "One less thing to wonder about" : "The little things, remembered";
   $("#resultCount").textContent = `${items.length} ${items.length === 1 ? "item" : "items"}`;
   const filtered = Boolean(term || activeRoom !== "All" || $("#statusFilter").value !== "All");
@@ -498,11 +507,17 @@ function renderInventory() {
     copy.append(button(item.name, "item-name", () => editItem(item.id)), textNode("p", metaText(item), "item-meta"));
     copy.append(textNode("p", savedDate(item.checkedAt || item.updatedAt, item.checkedAt ? "Checked" : "Saved"), "memory-date"));
     if (item.notes) copy.append(textNode("p", item.notes, "item-notes"));
-    const status = textNode("span", statuses[item.status], `item-status ${statusClass(item.status)}`);
-    card.append(thumb, copy, status);
-    if (currentLocation === "asheville" && item.homeId === "asheville") {
-      card.append(button(item.status === "In stock" ? "Took home" : item.status === "Running low" ? "Restocked" : "Here now", "text-button item-maintain", () => updateStatus(item.id, item.status === "In stock" ? "Out" : "In stock")));
-    } else card.append(button("···", "edit-button", () => editItem(item.id), `More options for ${item.name}`));
+    // A native phone picker updates availability without opening the item form.
+    const availability = document.createElement("select");
+    availability.className = `item-status availability-picker ${statusClass(item.status)}`;
+    availability.setAttribute("aria-label", `Update ${item.name} in ${homeName(item.homeId)}`);
+    const current = new Option(item.status === "Out" ? "Need it" : statuses[item.status], "", true, true); current.disabled = true;
+    availability.append(current);
+    const actions = [["In stock", item.status === "Running low" ? "Restocked" : "Have it"], ["Running low", "Running low"], ["Out", "Used up"], ["Unknown", "Not sure"]];
+    if (item.homeId === "asheville" && currentLocation === "asheville" && item.status !== "Out") actions.splice(3, 0, ["took-home", "Took home"]);
+    actions.filter(([value]) => value !== item.status).forEach(([value, label]) => availability.append(new Option(label, value)));
+    availability.addEventListener("change", () => updateStatus(item.id, availability.value === "took-home" ? "Out" : availability.value));
+    card.append(thumb, copy, availability);
     setupSwipe(card, item.id); shell.append(underlay, card); $("#inventoryList").append(shell);
   });
   // Photo-only rooms also participate in search, without inventing item records.
@@ -516,7 +531,8 @@ function renderInventory() {
   });
   if (places.length) $("#resultCount").textContent = `${items.length + places.length} ${items.length + places.length === 1 ? "result" : "results"}`;
   const empty = items.length === 0 && places.length === 0;
-  $("#emptyInventory").classList.toggle("visible", empty);
+  const hasRoomPhotos = !filtered && state.places.some((place) => isHere(place) && place.photo);
+  $("#emptyInventory").classList.toggle("visible", empty && !hasRoomPhotos);
   const photoOnlyRoom = activeRoom !== "All" && !term && $("#statusFilter").value === "All" && state.places.some((place) => isHere(place) && place.name === activeRoom && place.photo);
   $("#emptyInventory h3").textContent = photoOnlyRoom ? "The photo has you covered." : filtered ? "Nothing on this list yet." : "A little less to remember.";
   $("#emptyInventory p").textContent = photoOnlyRoom ? "List individual items only when you want to find them by name. A photo is enough to start." : filtered ? "Try another search, clear the filters, or add what belongs here." : "Add something you always wonder about when packing. Or just take a photo of a closet.";
@@ -929,7 +945,7 @@ function setup() {
   $("#leavingAsheville").addEventListener("click", () => showDialog($("#departureDialog")));
   $("#departureReminder").addEventListener("click", async () => { await closeDialog($("#departureDialog")); switchView("trip"); $("#taskText").focus(); });
   $("#departureReturn").addEventListener("click", async () => { await closeDialog($("#departureDialog")); switchView("return"); $("#taskText").focus(); });
-  $("#departureItems").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(true); showToast("Find what you took home, then tap Took home."); });
+  $("#departureItems").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(true); showToast("Find the item, tap its status, then choose Took home."); });
   $("#departurePhoto").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showMemory(); showToast("Tap the camera on the space that changed, or add a new photo."); });
   $("#finishDeparture").addEventListener("click", async () => { await closeDialog($("#departureDialog")); showToast("Ready for next time. Your list is saved."); });
   setupVoice();

@@ -50,13 +50,17 @@ Firebase's general `**/.*` pattern does not exclude their contents.
   `photoUpdatedAt` and `checkedAt`. Old data defaults these safely. A packing check
   never changes inventory status. Only an explicit inventory update / Here now
   changes what is present. Completed reminders persist and can be unchecked;
-  switching locations never clears or resets them. Take home uses existing tasks
+  switching locations never clears or resets them. To Morganton uses existing tasks
   with `homeId: morganton`; Next time/packing uses `homeId: asheville`. Neither
   direction moves inventory automatically. Draft text stays separate between the
   two lists; Browser Back restores the selected list. Other-home inventory stays
   in the memory filter; reminders for additional homes stay in a collapsed section.
-  The Already there tab shows a saved-entry count so stock is visible even when
-  the packing list is empty.
+  Tabs name destinations explicitly: To Asheville, To Morganton, and In Asheville
+  (using editable home names). The memory tab shows a saved-entry count; searchable
+  items appear before room cards. Compact phone headings keep the list in reach.
+  Each item’s native availability picker saves immediately with Undo: Running low,
+  Used up, Have it / Restocked, Not sure, and Took home while in Asheville. Used up
+  and Took home both set Out; neither changes the item’s saved home.
 - Voice capture: optional native SpeechRecognition/webkitSpeechRecognition in
   app.js, started only by a tap. It fills an editable reminder; Add is explicit.
   Cancel capture on navigation/backgrounding and preserve typing on errors.
@@ -102,7 +106,10 @@ a `package.json` just to have "a loop." Verify manually instead:
      change a saved item’s room using the native picker and add a custom room.
      Reopen/reload to verify its room, photo, details, and packing check survive;
      switching the item’s saved home must refresh that home’s room choices.
-     Use its status select for Have it/Running low/Need it/Not sure. Swipe right
+     Use its form status select, plus the card’s native availability picker for
+     Running low/Used up/Have it or Restocked/Not sure, and Took home in Asheville.
+     Verify packing needs, Undo, reload, preserved item details/photos/home, and
+     that tapping the native picker does not trigger an item swipe. Swipe right
      and left, then Undo. Delete through the edit dialog and check both cancel
      and confirm. Attach/replace/remove an item photo and open it full size.
    - **Room photos**: Quick photo creates a standalone room/closet card without
@@ -110,7 +117,7 @@ a `package.json` just to have "a loop." Verify manually instead:
      renaming a photographed room (its items move along with it).
    - **Current location**: Morganton opens the packing list; Asheville opens
      next-time capture. The same Asheville reminders/needs appear in both.
-     Take home adds/checks/copies a separate Morganton-bound list, including
+     To Morganton adds/checks/copies a separate Morganton-bound list, including
      existing Morganton reminders. Switch between lists, preserve each draft,
      reload, and use Back; checking a take-home task must not move inventory.
      Location is remembered on this device only. Other saved home inventory is
@@ -120,7 +127,7 @@ a `package.json` just to have "a loop." Verify manually instead:
      explicitly updates it after arrival. Completed reminders must survive reload
      and location switches; a repeated completed reminder reopens without duplicates.
    - **Upkeep**: exercise all Leaving Asheville checkpoint paths. Took home adds
-     an inventory need; Here now removes it. The departure Take home shortcut
+     an inventory need; Here now removes it. The departure Morganton shortcut
      opens the Morganton-bound list with capture ready. Refresh only a changed photo or use
      Still looks right for that specific room. Other edits and All set must not
      stamp every photo as checked. Show saved dates honestly for older records.

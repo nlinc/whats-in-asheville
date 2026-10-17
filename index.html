@@ -12,7 +12,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20261017-home4">
+    <link rel="stylesheet" href="styles.css?v=20261017-simple6">
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to today</a>
@@ -52,35 +52,17 @@
           <p id="heroDescription">A little less to remember. A little less to bring.</p>
         </section>
         <nav class="view-tabs" aria-label="What do you need?">
-          <button class="tab active" data-view="trip" type="button" aria-pressed="true" id="todayTab">Packing list <span id="tripTaskCount" class="tab-count">0</span></button>
-          <button class="tab" data-view="return" type="button" aria-pressed="false" id="returnTab">Take home <span id="returnTaskCount" class="tab-count">0</span></button>
-          <button class="tab" data-view="inventory" type="button" aria-pressed="false" id="memoryTab">Already in Asheville</button>
+          <button class="tab active" data-view="trip" type="button" aria-pressed="true" id="todayTab">To Asheville <span id="tripTaskCount" class="tab-count">0</span></button>
+          <button class="tab" data-view="return" type="button" aria-pressed="false" id="returnTab">To Morganton <span id="returnTaskCount" class="tab-count">0</span></button>
+          <button class="tab" data-view="inventory" type="button" aria-pressed="false" id="memoryTab">In Asheville</button>
         </nav>
         <section id="inventoryView" class="view" aria-label="Inventory">
           <div class="memory-top">
             <div class="search-bar">
-              <span aria-hidden="true">⌕</span><input id="searchInput" type="search" aria-label="What is already here?" placeholder="Do we already have a…" autocomplete="off">
+              <span aria-hidden="true">⌕</span><input id="searchInput" type="search" aria-label="Search in Asheville" placeholder="Search in Asheville…" autocomplete="off">
             </div>
             <div class="memory-actions"><button id="jumpToAddItem" class="secondary-button" type="button">+ Remember an item</button><button id="memoryPhoto" class="text-button" type="button">Take a photo</button></div>
           </div>
-          <section id="roomsSection">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">
-                  The photos remember for you
-                </p>
-                <h2>
-                  A quick look inside.
-                </h2>
-              </div>
-              <button class="text-button" id="quickPhoto" type="button"><span aria-hidden="true">▧</span> Quick photo</button>
-            </div>
-            <div id="roomGrid" class="room-grid">
-            </div>
-            <p class="room-help">
-              A closet photo counts. You don’t have to list every little thing.
-            </p>
-          </section>
           <div id="roomDetail" class="hidden">
             <button id="backToRooms" class="text-button back-button" type="button">← All rooms</button>
             <div id="roomOverview">
@@ -93,7 +75,7 @@
                   The little things, remembered
                 </p>
                 <h2 id="listHeading">
-                  Everything here
+                  In Asheville
                 </h2>
               </div>
               <span id="resultCount" class="count-label"></span>
@@ -124,6 +106,24 @@
               <button class="primary-button" data-add-item type="button">+ Your first item</button>
             </div>
           </section>
+          <section id="roomsSection">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">
+                  The photos remember for you
+                </p>
+                <h2>
+                  A quick look inside.
+                </h2>
+              </div>
+              <button class="text-button" id="quickPhoto" type="button"><span aria-hidden="true">▧</span> Quick photo</button>
+            </div>
+            <div id="roomGrid" class="room-grid">
+            </div>
+            <p class="room-help">
+              A closet photo counts. You don’t have to list every little thing.
+            </p>
+          </section>
         </section>
         <section id="tripView" class="view active" aria-label="Packing and next time">
           <form id="taskForm" class="capture-form">
@@ -133,7 +133,7 @@
               <button id="voiceCapture" class="voice-button" type="button" aria-pressed="false" aria-label="Speak a reminder">Speak</button>
               <button class="primary-button" type="submit">Add</button>
             </div>
-            <p id="voiceStatus" class="capture-help" role="status">A thought now. Remembered next time.</p>
+            <p id="voiceStatus" class="capture-help" role="status"></p>
           </form>
           <div class="packing-heading"><h2 id="packingHeading">Into the car</h2><span id="packingCount" class="count-label"></span></div>
           <p id="packingHelp" class="section-intro">Check it off once it’s in the car.</p>
@@ -153,8 +153,8 @@
       <div class="dialog-heading"><div><p class="eyebrow">Before you head home</p><h2 id="departureHeading">Anything changed?</h2></div><button class="close-button" data-close="departureDialog" type="button" aria-label="Close departure check">×</button></div>
       <p class="muted">Only the changes. You don’t have to check everything.</p>
       <button id="departureReminder" class="departure-action" type="button"><strong>We need something next time</strong><span>Add a quick reminder →</span></button>
-      <button id="departureReturn" class="departure-action" type="button"><strong>Something needs to come home</strong><span>Add it to Take home →</span></button>
-      <button id="departureItems" class="departure-action" type="button"><strong>We took something home</strong><span>Find it and tap “Took home” →</span></button>
+      <button id="departureReturn" class="departure-action" type="button"><strong>Something needs to come home</strong><span>Add to the Morganton list →</span></button>
+      <button id="departureItems" class="departure-action" type="button"><strong>We took something home</strong><span>Tap its status, then choose “Took home” →</span></button>
       <button id="departurePhoto" class="departure-action" type="button"><strong>A closet or cabinet changed</strong><span>Update its photo →</span></button>
       <button id="finishDeparture" class="primary-button" type="button">All set for next time</button>
     </dialog>
@@ -339,7 +339,7 @@
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
     </div>
-    <script type="module" src="app.js?v=20261017-home4"></script>
-    <script type="module" src="pwa.js?v=20261017-home4"></script>
+    <script type="module" src="app.js?v=20261017-simple6"></script>
+    <script type="module" src="pwa.js?v=20261017-simple6"></script>
   </body>
 </html>
