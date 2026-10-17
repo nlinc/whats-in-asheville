@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261017-simple6";
+import { firebaseService } from "./firebase-client.js?v=20261017-polish7";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -258,7 +258,7 @@ async function saveCloudState() {
     render();
     await firebaseService.saveState(state);
     setDirty(false);
-    updateSyncStatus({ mode: "cloud", message: `Shared as ${firebaseService.user.displayName || firebaseService.user.email}. Your changes are saved.` });
+    updateSyncStatus({ mode: "cloud", message: "Your changes are shared and saved." });
     return true;
   } catch (error) {
     setDirty(true);
@@ -280,6 +280,8 @@ function savedMessage(saved, message) { if (saved !== null) showToast(saved ? me
 function updateSyncStatus(status) {
   $("#syncDot").className = `sync-dot ${status.mode}`;
   $("#syncMode").textContent = ({ cloud: "Shared & saved", saving: "Saving…", loading: "Connecting…", "signed-out": "On this device", error: "Check sharing", local: "On this device" })[status.mode] || "On this device";
+  $("#syncIdentity").textContent = firebaseService.user ? `Signed in as ${firebaseService.user.displayName || firebaseService.user.email}.` : "";
+  $("#syncIdentity").classList.toggle("hidden", !firebaseService.user);
   $("#syncMessage").textContent = status.mode === "signed-out" ? "Sign in with Google so you both see the same list. Until then, changes stay on this device." : status.message;
   $("#signInButton").classList.toggle("hidden", !firebaseService.enabled || Boolean(firebaseService.user));
   $("#signOutButton").classList.toggle("hidden", !firebaseService.user);

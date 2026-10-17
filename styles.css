@@ -2110,8 +2110,8 @@ summary>span,.optional {
   #homeNav { padding-bottom: 10px; }
   .main { padding-top: 10px; }
   .view-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; overflow: visible; }
-  .tab { white-space: normal; flex-shrink: 1; min-width: 0; justify-content: center; text-align: center; line-height: 1.35; }
-  .tab-count { flex-shrink: 0; }
+  .tab { white-space: normal; flex-shrink: 1; flex-wrap: wrap; min-width: 0; justify-content: center; text-align: center; line-height: 1.35; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+  .tab-count { flex-shrink: 0; font-size: 11px; }
   .capture-input input { min-height: 44px; padding: 10px; }
   .capture-input .primary-button { min-height: 44px; }
   .packing-heading { margin-top: 18px; }

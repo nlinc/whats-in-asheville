@@ -53,10 +53,10 @@ const service = {
           return;
         }
 
-        onStatus({ mode: "loading", message: `Opening the shared list for ${user.displayName || user.email}…` });
+        onStatus({ mode: "loading", message: "Opening your shared list…" });
         unsubscribeState = firestoreModule.onSnapshot(docRef, (snapshot) => {
           service.ready = true;
-          onStatus({ mode: "cloud", message: `Shared as ${user.displayName || user.email}.` });
+          onStatus({ mode: "cloud", message: "Your shared list is up to date." });
           if (!snapshot.exists()) {
             onState(null);
             return;

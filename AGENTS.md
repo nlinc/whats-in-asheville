@@ -141,7 +141,10 @@ a `package.json` just to have "a loop." Verify manually instead:
      cancel and confirm. Invalid backup entries must not replace existing data.
    - **Sign-in flow** (if `firebase-config.js` has real values and you can reach
      Firebase): Sign In, confirm sharing updates from On this device →
-     Connecting → Shared & saved, add an item, confirm it round-trips through Firestore. If
+     Connecting → Shared & saved, add an item, confirm it round-trips through Firestore.
+     Settings names Nick & Christina’s shared list and shows the signed-in identity
+     separately from connection/save status. Check both users and signed-out/local
+     states; the household label does not imply both users are currently online. If
      the device has signed-out changes, verify the explicit local-versus-shared
      choice before either list is replaced.
    - **Mobile viewport**: check 390px and 320px widths plus desktop. Search must
