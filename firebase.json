@@ -12,7 +12,10 @@
       "**/.*",
       ".git/**",
       ".firebase/**",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "scripts/**",
+      "tests/**",
+      "docs/**"
     ],
     "headers": [
       {

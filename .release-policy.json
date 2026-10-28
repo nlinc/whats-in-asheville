@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "app": "asheville-tracker",
+  "assets": [
+    {
+      "source": "app.js",
+      "path": "app.js"
+    },
+    {
+      "source": "firebase-client.js",
+      "path": "firebase-client.js"
+    },
+    {
+      "source": "firebase-config.js",
+      "path": "firebase-config.js"
+    },
+    {
+      "source": "icons/app-icon.svg",
+      "path": "icons/app-icon.svg"
+    },
+    {
+      "source": "icons/apple-touch-icon.png",
+      "path": "icons/apple-touch-icon.png"
+    },
+    {
+      "source": "icons/icon-192.png",
+      "path": "icons/icon-192.png"
+    },
+    {
+      "source": "icons/icon-512.png",
+      "path": "icons/icon-512.png"
+    },
+    {
+      "source": "index.html",
+      "path": "index.html"
+    },
+    {
+      "source": "manifest.webmanifest",
+      "path": "manifest.webmanifest"
+    },
+    {
+      "source": "pwa.js",
+      "path": "pwa.js"
+    },
+    {
+      "source": "styles.css",
+      "path": "styles.css"
+    },
+    {
+      "source": "sw.js",
+      "path": "sw.js"
+    }
+  ],
+  "checks": [
+    [
+      "node",
+      "--check",
+      "app.js"
+    ],
+    [
+      "node",
+      "--check",
+      "firebase-client.js"
+    ],
+    [
+      "node",
+      "--check",
+      "pwa.js"
+    ],
+    [
+      "node",
+      "--check",
+      "sw.js"
+    ],
+    [
+      "node",
+      "--test",
+      "scripts/hosting-release.test.mjs"
+    ]
+  ]
+}
