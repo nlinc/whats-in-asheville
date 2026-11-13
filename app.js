@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261017-polish7";
+import { firebaseService } from "./firebase-client.js?v=20261113-recovery";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -216,13 +216,14 @@ function loadState() {
 }
 function setDirty(dirty) { localStorage.setItem(DIRTY_KEY, String(dirty)); }
 function hasLocalChanges() { return localStorage.getItem(DIRTY_KEY) === "true"; }
-async function saveState() {
-  if (loadFailure) { showToast("Saved data could not be opened. Export it from settings or import a valid backup first."); return null; }
+async function saveState({ importingBackup = false } = {}) {
+  if (loadFailure && !importingBackup) { showToast("Saved data could not be opened. Export it from settings or import a valid backup first."); return null; }
   state.updatedAt = new Date().toISOString();
   try {
     setDirty(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     durableState = structuredClone(state);
+    if (importingBackup) loadFailure = false;
   } catch {
     state = structuredClone(durableState);
     render();
@@ -887,9 +888,12 @@ async function importData(event) {
   try {
     const next = normalizeState(JSON.parse(await file.text()));
     if (!await confirmAction({ title: "Replace your inventory?", message: "This backup will replace both homes, room photos, and your trip list. Export a copy of the current list first if you want to keep it.", accept: "Import and replace", cancel: "Keep current list" })) return;
-    loadFailure = false;
-    state = next; activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All";
-    savedMessage(await saveState(), "Backup imported.");
+    state = next;
+    const saved = await saveState({ importingBackup: true });
+    if (saved === null) return;
+    activeRoom = "All"; $("#searchInput").value = ""; $("#statusFilter").value = "All";
+    render();
+    savedMessage(saved, "Backup imported.");
   } catch (error) { showToast(`Could not import this file: ${error.message}`); }
   finally { event.target.value = ""; }
 }
