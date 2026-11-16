@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261113-recovery";
+import { firebaseService } from "./firebase-client.js?v=20261116-drafts";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -216,7 +216,7 @@ function loadState() {
 }
 function setDirty(dirty) { localStorage.setItem(DIRTY_KEY, String(dirty)); }
 function hasLocalChanges() { return localStorage.getItem(DIRTY_KEY) === "true"; }
-async function saveState({ importingBackup = false } = {}) {
+async function saveState({ importingBackup = false, onSavedLocally } = {}) {
   if (loadFailure && !importingBackup) { showToast("Saved data could not be opened. Export it from settings or import a valid backup first."); return null; }
   state.updatedAt = new Date().toISOString();
   try {
@@ -230,6 +230,7 @@ async function saveState({ importingBackup = false } = {}) {
     showToast("Device storage is full. Nothing was changed. Export a backup.");
     return null;
   }
+  onSavedLocally?.();
   render();
   if (navigator.onLine === false) {
     updateSyncStatus({ mode: "local", message: "Offline. Changes are saved on this device. Reopen when connected to review and share them." });
@@ -812,8 +813,13 @@ async function addTask(event) {
   const existing = state.tasks.find((task) => task.homeId === destination && task.text.toLocaleLowerCase() === text.toLocaleLowerCase());
   if (existing) existing.done = false;
   else state.tasks.unshift({ id: id(), text, type: "Bring", done: false, homeId: destination });
-  const saved = await saveState();
-  if (saved !== null) { reminderDrafts[destination] = ""; if (listHome() === destination) $("#taskText").value = ""; savedMessage(saved, destination === "morganton" ? `On your take-home list for ${homeName(destination)}.` : "On your next-trip list."); }
+  const saved = await saveState({ onSavedLocally: () => {
+    // The submitted reminder is durable. A later sharing result must leave
+    // anything the user types next in this field alone.
+    reminderDrafts[destination] = "";
+    if (listHome() === destination) $("#taskText").value = "";
+  } });
+  savedMessage(saved, destination === "morganton" ? `On your take-home list for ${homeName(destination)}.` : "On your next-trip list.");
 }
 async function copyChecklist() {
   const destination = listHome();

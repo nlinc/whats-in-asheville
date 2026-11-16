@@ -129,6 +129,9 @@ a `package.json` just to have "a loop." Verify manually instead:
      Location is remembered on this device only. Other saved home inventory is
      reachable under Other homes & filters; older reminders remain accessible.
    - **Packing/capture**: add with text only, check/uncheck, remove/Undo, copy.
+     With mocked slow sharing, a locally saved reminder clears immediately.
+     Text entered next survives the earlier sharing result, list switches and
+     Back. A failed local write keeps the submitted draft for retry.
      Check a low/out inventory need and confirm its status is unchanged. Here now
      explicitly updates it after arrival. Completed reminders must survive reload
      and location switches; a repeated completed reminder reopens without duplicates.

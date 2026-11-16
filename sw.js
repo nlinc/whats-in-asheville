@@ -1,13 +1,13 @@
 // Cache only this release's public app shell. Never intercept Firebase/auth/photo requests.
 const CACHE_PREFIX = "whats-where-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261113-recovery`;
+const CACHE_NAME = `${CACHE_PREFIX}20261116-drafts`;
 const ASSETS = [
   "./index.html",
-  "./styles.css?v=20261113-recovery",
-  "./app.js?v=20261113-recovery",
-  "./firebase-client.js?v=20261113-recovery",
+  "./styles.css?v=20261116-drafts",
+  "./app.js?v=20261116-drafts",
+  "./firebase-client.js?v=20261116-drafts",
   "./firebase-config.js",
-  "./pwa.js?v=20261113-recovery",
+  "./pwa.js?v=20261116-drafts",
   "./manifest.webmanifest",
   "./icons/app-icon.svg",
   "./icons/icon-192.png",
