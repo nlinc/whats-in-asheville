@@ -9,6 +9,18 @@ let storage;
 let docRef;
 let unsubscribeState = null;
 
+function householdFromSnapshot(snapshot) {
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data();
+  return {
+    homes: data.homes,
+    places: data.places,
+    items: Array.isArray(data.items) ? data.items : [],
+    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+    updatedAt: data.updatedAt || new Date().toISOString()
+  };
+}
+
 const service = {
   enabled: hasConfig,
   user: null,
@@ -54,27 +66,14 @@ const service = {
         }
 
         onStatus({ mode: "loading", message: "Opening your shared list…" });
-        unsubscribeState = firestoreModule.onSnapshot(docRef, (snapshot) => {
+        unsubscribeState = firestoreModule.onSnapshot(docRef, { includeMetadataChanges: true }, (snapshot) => {
+          if (service.user !== user || snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
           service.ready = true;
-          onStatus({ mode: "cloud", message: "Your shared list is up to date." });
-          if (!snapshot.exists()) {
-            onState(null);
-            return;
-          }
-          const data = snapshot.data();
-          onState({
-            homes: data.homes,
-            places: data.places,
-            items: Array.isArray(data.items) ? data.items : [],
-            tasks: Array.isArray(data.tasks) ? data.tasks : [],
-            updatedAt: data.updatedAt || new Date().toISOString()
-          });
+          onState(householdFromSnapshot(snapshot));
         }, (error) => {
           onStatus({ mode: "error", message: `Firebase sync error: ${error.message}` });
         });
       });
-
-      onStatus({ mode: "signed-out", message: "Firebase ready. Sign in to sync." });
     } catch (error) {
       onStatus({ mode: "error", message: `Firebase setup failed: ${friendlyFirebaseError(error)}` });
     }
@@ -91,18 +90,24 @@ const service = {
     await authModule.signOut(auth);
   },
   async saveState(state) {
-    if (!docRef || !service.user || !service.ready) throw new Error("The shared list is still loading. Your changes are saved on this device.");
+    const user = service.user;
+    if (!docRef || !user || !service.ready) throw new Error("The shared list is still loading. Your changes are saved on this device.");
     const firestoreModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-firestore.js`);
+    if (service.user !== user) throw new Error("Sign-in changed before this list could be shared.");
     await firestoreModule.setDoc(docRef, {
       ...state,
       householdId,
       updatedAt: new Date().toISOString(),
       updatedBy: {
-        uid: service.user.uid,
-        email: service.user.email || "",
-        name: service.user.displayName || ""
+        uid: user.uid,
+        email: user.email || "",
+        name: user.displayName || ""
       }
     }, { merge: true });
+  },
+  async readServerState() {
+    const firestoreModule = await import(`https://www.gstatic.com/firebasejs/${sdkVersion}/firebase-firestore.js`);
+    return householdFromSnapshot(await firestoreModule.getDocFromServer(docRef));
   },
   async uploadPhoto(file, itemId) {
     if (!storage || !service.user || !file || !file.size) return "";

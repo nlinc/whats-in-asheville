@@ -68,6 +68,9 @@ Firebase is optional for local use. Shared inventory and cloud photo access need
 sign-in. After one online visit, the service worker caches the app shell for offline
 startup. Inventory saved on that device remains available. Sharing and cloud
 photos need a connection. Reopen online to review and share offline changes.
+During sharing, edits keep saving on this device. **Shared & saved** appears
+when the server confirms the current list. If another tab saved a newer list,
+reopen this tab to review it before making more changes.
 The worker caches only public app assets, never Firebase or authentication
 responses. Updates activate after old windows close, or when you explicitly tap ↻ Refresh
 app. Only that window reloads, after checking that no work is unfinished.

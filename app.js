@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261116-drafts";
+import { firebaseService } from "./firebase-client.js?v=20261117-sync";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -9,6 +9,8 @@ const categories = ["Other", "Food", "Paper goods", "Toiletries", "Linens", "Cle
 const statuses = { "In stock": "Have it", "Running low": "Running low", "Out": "Bring next time", "Unknown": "Not sure" };
 const $ = (selector) => document.querySelector(selector);
 let loadFailure = false;
+let durableRaw = null;
+let durableRevision = "";
 let state = loadState();
 let durableState = structuredClone(state);
 const LOCATION_KEY = `${STORAGE_KEY}-current-location`;
@@ -31,6 +33,8 @@ let editingPlaceId = null;
 let photoJob = 0;
 let resolvingRemoteState = false;
 let pendingCloudSaves = 0;
+let cloudSaveQueue = Promise.resolve();
+let sharedStateDuringSave;
 let toastTimer;
 let undoAction = null;
 
@@ -205,8 +209,12 @@ function normalizeState(raw = {}) {
 }
 function loadState() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return normalizeState(JSON.parse(saved));
+    durableRaw = localStorage.getItem(STORAGE_KEY);
+    if (durableRaw) {
+      const saved = JSON.parse(durableRaw);
+      durableRevision = typeof saved.localRevision === "string" ? saved.localRevision : "";
+      return normalizeState(saved);
+    }
   } catch (error) {
     // Leave the original stored data intact so it can be recovered.
     loadFailure = true;
@@ -214,15 +222,43 @@ function loadState() {
   }
   return normalizeState({ items: [], tasks: [] });
 }
-function setDirty(dirty) { localStorage.setItem(DIRTY_KEY, String(dirty)); }
-function hasLocalChanges() { return localStorage.getItem(DIRTY_KEY) === "true"; }
+function sharedMarker() { return durableRevision ? `shared:${durableRevision}` : "false"; }
+function markShared() { localStorage.setItem(DIRTY_KEY, sharedMarker()); }
+function hasLocalChanges() {
+  const marker = localStorage.getItem(DIRTY_KEY);
+  return durableRevision ? marker !== sharedMarker() : marker === "true";
+}
+function storeDeviceState(next) {
+  // The acknowledgement identifies one stored list, even if another tab saves afterward.
+  const revision = id();
+  const raw = JSON.stringify({ ...next, localRevision: revision });
+  localStorage.setItem(STORAGE_KEY, raw);
+  durableRaw = raw;
+  durableRevision = revision;
+  durableState = structuredClone(next);
+}
+function deviceListIsCurrent() {
+  try {
+    if (localStorage.getItem(STORAGE_KEY) === durableRaw) return true;
+  } catch {
+    updateSyncStatus({ mode: "error", message: "Could not check the list stored on this device. Reopen the app before sharing." });
+    return false;
+  }
+  updateSyncStatus({ mode: "local", message: "Another tab saved this list. Reopen this tab to see those changes." });
+  return false;
+}
 async function saveState({ importingBackup = false, onSavedLocally } = {}) {
   if (loadFailure && !importingBackup) { showToast("Saved data could not be opened. Export it from settings or import a valid backup first."); return null; }
   state.updatedAt = new Date().toISOString();
   try {
-    setDirty(true);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    durableState = structuredClone(state);
+    if (!deviceListIsCurrent()) {
+      state = structuredClone(durableState);
+      render();
+      showToast("Another tab saved this list. Reopen this tab before making changes.");
+      return null;
+    }
+    localStorage.setItem(DIRTY_KEY, "true");
+    storeDeviceState(state);
     if (importingBackup) loadFailure = false;
   } catch {
     state = structuredClone(durableState);
@@ -239,35 +275,66 @@ async function saveState({ importingBackup = false, onSavedLocally } = {}) {
   if (!firebaseService.user) return true;
   return saveCloudState();
 }
-async function saveCloudState() {
+function saveCloudState() {
   if (!firebaseService.ready) return false;
+  const user = firebaseService.user;
   pendingCloudSaves++;
   updateSyncStatus({ mode: "saving", message: "Saving your changes to the shared list…" });
+  const next = cloudSaveQueue.then(() => writeCloudState(user)).then(saved => {
+    pendingCloudSaves--;
+    if (pendingCloudSaves === 0) {
+      const buffered = sharedStateDuringSave;
+      sharedStateDuringSave = undefined;
+      // A different update received while saving might be older than the write.
+      // Re-read the server once before deciding whether to apply it.
+      if (saved && buffered !== undefined && (!buffered || listContents(buffered) !== listContents(durableState))) {
+        void refreshSharedState(user, durableRaw);
+      }
+    }
+    return saved;
+  });
+  cloudSaveQueue = next;
+  return next;
+}
+async function writeCloudState(user) {
   try {
+    if (!user || user !== firebaseService.user || !firebaseService.ready || !deviceListIsCurrent()) return false;
+    if (navigator.onLine === false) {
+      updateSyncStatus({ mode: "local", message: "Offline. Changes are saved on this device." });
+      return false;
+    }
+    let sentRaw = durableRaw;
+    const candidate = structuredClone(durableState);
+    let convertedPhotos = false;
     // Photos captured while signed out move to Storage before sharing the document.
     // Keep data URLs intact locally if any upload fails.
     for (const collection of ["items", "places"]) {
-      for (const entry of [...state[collection]]) {
+      for (const entry of candidate[collection]) {
         if (!entry.photo.startsWith("data:")) continue;
-        const localPhoto = entry.photo;
-        const uploaded = await cloudPhoto(localPhoto, true, entry.id);
-        const current = state[collection].find((record) => record.id === entry.id);
-        if (current?.photo === localPhoto) current.photo = uploaded;
+        entry.photo = await cloudPhoto(entry.photo, true, entry.id);
+        if (!entry.photo || entry.photo.startsWith("data:")) throw new Error("A photo could not be shared.");
+        convertedPhotos = true;
       }
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    durableState = structuredClone(state);
-    render();
-    await firebaseService.saveState(state);
-    setDirty(false);
+    if (user !== firebaseService.user || !deviceListIsCurrent() || sentRaw !== durableRaw) return false;
+    if (convertedPhotos) {
+      storeDeviceState(candidate);
+      state = candidate;
+      sentRaw = durableRaw;
+      render();
+    }
+    await firebaseService.saveState(candidate);
+    if (user !== firebaseService.user || !deviceListIsCurrent() || sentRaw !== durableRaw || pendingCloudSaves > 1) {
+      return false;
+    }
+    markShared();
     updateSyncStatus({ mode: "cloud", message: "Your changes are shared and saved." });
     return true;
   } catch (error) {
-    setDirty(true);
-    updateSyncStatus({ mode: "error", message: `Saved on this device. Sharing needs attention: ${error.message}` });
+    if (user === firebaseService.user && pendingCloudSaves === 1 && deviceListIsCurrent()) {
+      updateSyncStatus({ mode: "error", message: `Saved on this device. Sharing needs attention: ${error.message}` });
+    }
     return false;
-  } finally {
-    pendingCloudSaves--;
   }
 }
 function showToast(message, undo = null) {
@@ -288,42 +355,61 @@ function updateSyncStatus(status) {
   $("#signInButton").classList.toggle("hidden", !firebaseService.enabled || Boolean(firebaseService.user));
   $("#signOutButton").classList.toggle("hidden", !firebaseService.user);
 }
-function startFirebase() {
-  firebaseService.init({
-    onStatus: updateSyncStatus,
-    onState: async (rawRemote) => {
-      if (resolvingRemoteState || loadFailure) return;
-      if (!rawRemote) {
-        if (state.items.length || state.tasks.length || state.places.length || hasLocalChanges()) await saveCloudState();
+function listContents({ homes, items, tasks, places }) {
+  return JSON.stringify({ homes, items, tasks, places });
+}
+async function refreshSharedState(user, raw) {
+  try {
+    const latest = await firebaseService.readServerState();
+    if (!pendingCloudSaves && user === firebaseService.user && raw === durableRaw) await acceptSharedState(latest);
+  } catch { /* The listener can still deliver later server updates. */ }
+}
+async function acceptSharedState(rawRemote) {
+  if (pendingCloudSaves) {
+    sharedStateDuringSave = rawRemote;
+    return;
+  }
+  if (resolvingRemoteState || loadFailure || !deviceListIsCurrent()) return;
+  if (!rawRemote) {
+    if (state.items.length || state.tasks.length || state.places.length || hasLocalChanges()) await saveCloudState();
+    else updateSyncStatus({ mode: "cloud", message: "Your shared list is up to date." });
+    return;
+  }
+  let remote;
+  try { remote = normalizeState(rawRemote); } catch (error) {
+    updateSyncStatus({ mode: "error", message: `Could not read the shared list: ${error.message}` });
+    return;
+  }
+  const differs = listContents(durableState) !== listContents(remote);
+  if (hasLocalChanges() && differs) {
+    const user = firebaseService.user;
+    resolvingRemoteState = true;
+    try {
+      const useLocal = await confirmAction({ title: "Which list should you both use?", message: "This device has changes that are not shared yet. Using the device list replaces the shared list. Using the shared list discards this device’s changes. Choose before either list is replaced.", accept: "Use device list", cancel: "Use shared list", requireChoice: true });
+      if (user !== firebaseService.user || !deviceListIsCurrent()) return;
+      if (useLocal) {
+        await saveCloudState();
         return;
       }
-      let remote;
-      try { remote = normalizeState(rawRemote); } catch (error) {
-        updateSyncStatus({ mode: "error", message: `Could not read the shared list: ${error.message}` });
-        return;
-      }
-      const contents = ({ homes, items, tasks, places }) => JSON.stringify({ homes, items, tasks, places });
-      if (hasLocalChanges() && contents(state) !== contents(remote)) {
-        resolvingRemoteState = true;
-        const useLocal = await confirmAction({ title: "Which list should you both use?", message: "This device has changes that are not shared yet. Using the device list replaces the shared list. Using the shared list discards this device’s changes. Choose before either list is replaced.", accept: "Use device list", cancel: "Use shared list", requireChoice: true });
-        if (useLocal) {
-          await saveCloudState();
-          resolvingRemoteState = false;
-          return;
-        }
-        resolvingRemoteState = false;
-      }
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
-        setDirty(false);
-        state = remote;
-        durableState = structuredClone(state);
-        render();
-      } catch {
-        updateSyncStatus({ mode: "error", message: "Could not store the shared list on this device. Free some storage and reload." });
-      }
+    } finally {
+      resolvingRemoteState = false;
     }
-  });
+  }
+  try {
+    if (!deviceListIsCurrent()) return;
+    if (differs) {
+      storeDeviceState(remote);
+      state = remote;
+      render();
+    }
+    markShared();
+    updateSyncStatus({ mode: "cloud", message: "Your shared list is up to date." });
+  } catch {
+    updateSyncStatus({ mode: "error", message: "Could not store the shared list on this device. Free some storage and reload." });
+  }
+}
+function startFirebase() {
+  firebaseService.init({ onStatus: updateSyncStatus, onState: acceptSharedState });
 }
 function fillHomeSelect(select, selected) {
   select.replaceChildren(...state.homes.map((home) => new Option(home.name, home.id)));
