@@ -1,4 +1,4 @@
-import { firebaseService } from "./firebase-client.js?v=20261117-sync";
+import { firebaseService } from "./firebase-client.js?v=20261119-weekend";
 
 // Keep the original key so the redesign opens existing inventories in place.
 const STORAGE_KEY = "asheville-condo-tracker-v1";
@@ -917,6 +917,51 @@ async function copyChecklist() {
 ${lines.join("\n")}`); showToast("Packing list copied."); }
   catch { showToast("Copy wasn’t available. Try from your usual browser."); }
 }
+
+// WEEKEND_HANDOFF_START — selected text only; no cross-project account access.
+function weekendEntries() {
+  const destination = listHome();
+  const needs = destination === "asheville" ? tripNeeds().filter(item => !item.packedForTrip).map(item => ({
+    id: `item:${item.id}`, name: item.name, action: item.status === "Unknown" ? "check" : "bring"
+  })) : [];
+  const tasks = state.tasks.filter(task => task.homeId === destination && !task.done).map(task => ({
+    id: `task:${task.id}`, name: task.type === "Bring" ? task.text : `${task.type}: ${task.text}`, action: task.type === "Bring" ? "bring" : "task"
+  }));
+  return [...needs, ...tasks];
+}
+let weekendSnapshot = null;
+function openWeekend() {
+  const entries = weekendEntries();
+  if (entries.length > 100) { showToast("This list has more than 100 reminders. Copy your list instead, or shorten it first."); return; }
+  weekendSnapshot = { destination: { id: listHome(), name: homeName(listHome()) }, entries };
+  $("#weekendDestination").textContent = `To ${weekendSnapshot.destination.name}`;
+  $("#weekendEntries").replaceChildren();
+  for (const entry of entries) {
+    const label = textNode("label", "", "packing-row");
+    const check = document.createElement("input"); check.type = "checkbox"; check.checked = true; check.value = entry.id;
+    label.append(check, textNode("span", `${entry.action === "check" ? "Check: " : ""}${entry.name}`));
+    $("#weekendEntries").append(label);
+  }
+  $("#weekendStatus").textContent = entries.length ? "Uncheck anything you do not want in the file." : "Nothing left to bring. Completed reminders are excluded.";
+  $("#downloadWeekend").disabled = !entries.length;
+  showDialog($("#weekendDialog"));
+}
+function downloadWeekend() {
+  const status = $("#weekendStatus");
+  if (!weekendSnapshot || weekendSnapshot.destination.id !== listHome() || JSON.stringify(weekendSnapshot.entries) !== JSON.stringify(weekendEntries()) || weekendSnapshot.destination.name !== homeName(listHome())) {
+    status.textContent = "Your list changed. Close this review and open it again for the latest reminders."; return;
+  }
+  const selected = new Set([...$("#weekendEntries").querySelectorAll("input:checked")].map(input => input.value));
+  const entries = weekendSnapshot.entries.filter(entry => selected.has(entry.id));
+  if (!entries.length) { status.textContent = "Select at least one reminder."; return; }
+  const payload = { kind: "lincoln-weekend-reminders", version: 1, destination: weekendSnapshot.destination, exportedAt: new Date().toISOString(), entries };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url; link.download = `reminders-to-${payload.destination.id}.json`; document.body.append(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  status.textContent = "Downloaded. Open your packing list in Smart Packer to import this file. Nothing here was checked off.";
+}
+// WEEKEND_HANDOFF_END
 // Browser speech is optional and only starts on a deliberate tap. Review then Add.
 let voiceSession = null;
 let voiceTimer;
@@ -1037,6 +1082,8 @@ function setup() {
     if (message) { event.detail.message = message; event.preventDefault(); }
   });
   $("#copyChecklist").addEventListener("click", copyChecklist);
+  $("#openWeekend").addEventListener("click", openWeekend);
+  $("#downloadWeekend").addEventListener("click", downloadWeekend);
   $("#memoryHome").addEventListener("change", (event) => selectHome(event.target.value));
   $("#checkMemory").addEventListener("click", () => showMemory());
   $("#updateMemory").addEventListener("click", () => showMemory());

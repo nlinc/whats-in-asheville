@@ -79,3 +79,12 @@ The manifest, service worker, and icons are static files; there are still no
 build dependencies. The twelve-file Hosting allowlist is documented in AGENTS.md.
 When changing app code, bump the release query strings in index.html/app.js and
 the matching cache release and ASSETS list in sw.js.
+# Use reminders in Smart Packer
+
+On either destination list, **Use in Smart Packer** reviews the unfinished
+reminders and packing needs for that direction. Choose what to share and download
+the reminder file, then import it through **Bring reminders from Asheville** in
+Smart Packer’s active packing list. The file includes only selected reminder
+text, stable source IDs, destination and export date. It excludes inventory,
+photos, account identity and completed entries. Downloading never changes the
+source list or inventory. Cancel or an empty selection writes nothing.

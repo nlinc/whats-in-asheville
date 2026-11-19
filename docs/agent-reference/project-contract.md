@@ -70,6 +70,14 @@ Firebase's general `**/.*` pattern does not exclude their contents.
 - Voice capture: optional native SpeechRecognition/webkitSpeechRecognition in
   app.js, started only by a tap. It fills an editable reminder; Add is explicit.
   Cancel capture on navigation/backgrounding and preserve typing on errors.
+  **Use in Smart Packer** is an explicit local file handoff, not cloud sharing:
+  review at most 100 unfinished reminders/needs from the current direction,
+  select entries, then download `lincoln-weekend-reminders` version 1 JSON.
+  Only stable source IDs, text/action, destination and export date leave the app;
+  exclude photos, accounts, full inventory, completed entries and the other
+  destination. The source list and inventory never change. A changed source list
+  invalidates an open export review. Verify downloaded bytes with Packer’s parser,
+  cancellation, empty selection, both directions and Back/offline behavior.
   Unsupported browsers keep typing/keyboard dictation. No audio storage, AI
   parsing, paid transcription service, dependency, or server endpoint.
 - Styles: `styles.css`

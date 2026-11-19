@@ -12,7 +12,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20261117-sync">
+    <link rel="stylesheet" href="styles.css?v=20261119-weekend">
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to today</a>
@@ -142,7 +142,7 @@
           <details id="completedPacking" class="completed-packing"><summary id="completedSummary">Packed & done</summary><div id="completedList" class="packing-list"></div></details>
           <details id="otherReminders" class="completed-packing hidden"><summary>Saved reminders for other homes</summary><div id="otherRemindersList" class="packing-list"></div></details>
           <button id="checkMemory" class="memory-link" type="button"><span>Do we already have it?</span><small>Look at what’s in Asheville before packing more.</small><span aria-hidden="true">↗</span></button>
-          <div class="packing-tools"><button id="copyChecklist" class="text-button" type="button">Copy list</button><button id="updateMemory" class="text-button hidden" type="button">Update what’s here →</button></div>
+          <div class="packing-tools"><button id="copyChecklist" class="text-button" type="button">Copy list</button><button id="openWeekend" class="text-button" type="button">Use in Smart Packer</button><button id="updateMemory" class="text-button hidden" type="button">Update what’s here →</button></div>
         </section>
         <footer class="page-footer">
           <span>A home for the things you forget.</span><span id="lastUpdated"></span>
@@ -316,6 +316,15 @@
         </div>
       </section>
     </dialog>
+    <dialog id="weekendDialog" class="sheet" aria-labelledby="weekendHeading">
+      <div class="dialog-heading"><h2 id="weekendHeading">Bring these into Smart Packer</h2><button class="close-button" data-close="weekendDialog" type="button" aria-label="Close packing handoff">×</button></div>
+      <p id="weekendDestination" class="section-intro"></p>
+      <p>Choose reminders to download. In Smart Packer, open your trip’s packing list and choose <strong>Bring reminders from Asheville</strong>. Review them before adding.</p>
+      <p>Your inventory and checkmarks stay here. The file contains only the reminders you select.</p>
+      <div id="weekendEntries" class="packing-list"></div>
+      <p id="weekendStatus" role="status"></p>
+      <div class="dialog-actions"><button class="secondary-button" data-close="weekendDialog" type="button">Cancel</button><button id="downloadWeekend" class="primary-button" type="button">Download selected reminders</button></div>
+    </dialog>
     <dialog id="lightbox" class="lightbox" aria-label="Photo view">
       <button class="close-button" id="lightboxClose" type="button" aria-label="Close photo">×</button><img id="lightboxImg" alt="">
       <div class="lightbox-info">
@@ -340,7 +349,7 @@
     <div id="toast" class="toast hidden" role="status">
       <span id="toastText"></span><button id="toastUndo" type="button" class="hidden">Undo</button>
     </div>
-    <script type="module" src="app.js?v=20261117-sync"></script>
-    <script type="module" src="pwa.js?v=20261117-sync"></script>
+    <script type="module" src="app.js?v=20261119-weekend"></script>
+    <script type="module" src="pwa.js?v=20261119-weekend"></script>
   </body>
 </html>
